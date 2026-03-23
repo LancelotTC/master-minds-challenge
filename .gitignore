@@ -1,1 +1,5 @@
 database.db
+*.pyc
+tempCodeRunnerFile.*
+
+/eda_outputs
