@@ -1,6 +1,13 @@
-dct = eval(input("Enter a dictionary: "))
-
+import ast
 import json
 
-json_str = json.dumps(dct, indent=4)
+
+raw_value = input("Enter a Python dict or JSON object: ").strip()
+
+try:
+    parsed_value = json.loads(raw_value)
+except json.JSONDecodeError:
+    parsed_value = ast.literal_eval(raw_value)
+
+json_str = json.dumps(parsed_value, indent=4, ensure_ascii=False)
 print("JSON representation:\n", json_str)

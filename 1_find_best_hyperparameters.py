@@ -1,83 +1,41 @@
-import pandas as pd
-import os, json, random
-from skopt import BayesSearchCV
-from xgboost import XGBRegressor
-from sklearn.pipeline import Pipeline
-from catboost import CatBoostRegressor
-from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
-from sklearn.tree import DecisionTreeRegressor
-from skopt.space import Real, Integer, Categorical
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+import json
+import os
+import random
 
+from catboost import CatBoostRegressor
+from skopt import BayesSearchCV
+from skopt.space import Categorical, Integer, Real
 from sklearn.ensemble import (
-    RandomForestRegressor,
-    GradientBoostingRegressor,
     ExtraTreesRegressor,
+    GradientBoostingRegressor,
     HistGradientBoostingRegressor,
+    RandomForestRegressor,
 )
+from sklearn.pipeline import Pipeline
+from sklearn.tree import DecisionTreeRegressor
+from xgboost import XGBRegressor
+
+from movement_model_utils import load_training_and_prediction_frames, make_preprocessor
 
 RANDOM_SEED = 42
+SEARCH_ITERATIONS = 40
+CV_FOLDS = 3
+JOBS = 10
 
 
-def prepare_data(path):
-    df = pd.read_csv(path, skipinitialspace=True)
-    target_col = "NbPax"
-
-    df = df.dropna(subset=[target_col])
-    # df = df.drop(columns=["id"], errors="ignore")
-
-    X = df.drop(columns=[target_col])
-    y = df[target_col]
-    return X, y
+def prepare_data():
+    features, target, _, _ = load_training_and_prediction_frames()
+    return features, target
 
 
-def make_preprocessor(X: pd.DataFrame, scale_numeric: bool = False):
-    categorical_cols = [
-        "brand",
-        "model",
-        "car_class",
-        "range",
-        "fuel_type",
-        "hybrid",
-        "grbx_type_ratios",
-    ]
-    numeric_cols = [c for c in X.columns if c not in categorical_cols]
+def build_models(features):
+    preprocessor = make_preprocessor(features)
 
-    num_steps = [("imputer", SimpleImputer(strategy="mean"))]
-    if scale_numeric:
-        num_steps.append(("scaler", StandardScaler()))
-
-    numeric_transformer = Pipeline(steps=num_steps)
-
-    categorical_transformer = Pipeline(
-        steps=[
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            (
-                "encoder",
-                OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
-            ),
-        ]
-    )
-
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("num", numeric_transformer, numeric_cols),
-            ("cat", categorical_transformer, categorical_cols),
-        ]
-    )
-
-    return preprocessor
-
-
-def test_regressors(X, y, n_rounds=3):
-    preprocessor = make_preprocessor(X)
-
-    models = {
+    return {
         "CatBoostRegressor": (
             Pipeline(
                 [
-                    ("preprocess", make_preprocessor(X)),
+                    ("preprocess", preprocessor),
                     (
                         "model",
                         CatBoostRegressor(
@@ -97,17 +55,14 @@ def test_regressors(X, y, n_rounds=3):
                 "model__rsm": Real(0.5, 1.0),
                 "model__min_data_in_leaf": Integer(1, 200),
                 "model__leaf_estimation_method": Categorical(["Gradient"]),
-                "model__loss_function": ["MAE"],
+                "model__loss_function": Categorical(["MAE"]),
             },
         ),
         "XGBRegressor": (
             Pipeline(
                 [
                     ("preprocess", preprocessor),
-                    (
-                        "model",
-                        XGBRegressor(random_state=42),
-                    ),
+                    ("model", XGBRegressor(random_state=RANDOM_SEED)),
                 ]
             ),
             {
@@ -119,16 +74,16 @@ def test_regressors(X, y, n_rounds=3):
                 "model__gamma": Real(0.0, 5.0),
                 "model__reg_lambda": Real(0.0, 10.0),
                 "model__min_child_weight": Integer(1, 50),
-                "model__objective": ["reg:absoluteerror"],
-                "model__eval_metric": ["mae"],
-                "model__tree_method": ["hist"],
+                "model__objective": Categorical(["reg:absoluteerror"]),
+                "model__eval_metric": Categorical(["mae"]),
+                "model__tree_method": Categorical(["hist"]),
             },
         ),
         "DecisionTreeRegressor": (
             Pipeline(
                 [
                     ("preprocess", preprocessor),
-                    ("model", DecisionTreeRegressor(random_state=42)),
+                    ("model", DecisionTreeRegressor(random_state=RANDOM_SEED)),
                 ]
             ),
             {
@@ -144,7 +99,7 @@ def test_regressors(X, y, n_rounds=3):
             Pipeline(
                 [
                     ("preprocess", preprocessor),
-                    ("model", GradientBoostingRegressor(random_state=42)),
+                    ("model", GradientBoostingRegressor(random_state=RANDOM_SEED)),
                 ]
             ),
             {
@@ -152,14 +107,14 @@ def test_regressors(X, y, n_rounds=3):
                 "model__learning_rate": Real(1e-4, 0.3, prior="log-uniform"),
                 "model__max_depth": Integer(2, 10),
                 "model__subsample": Real(0.5, 1.0),
-                "model__loss": ["absolute_error"],
+                "model__loss": Categorical(["absolute_error"]),
             },
         ),
         "RandomForestRegressor": (
             Pipeline(
                 [
                     ("preprocess", preprocessor),
-                    ("model", RandomForestRegressor(random_state=42)),
+                    ("model", RandomForestRegressor(random_state=RANDOM_SEED)),
                 ]
             ),
             {
@@ -176,7 +131,7 @@ def test_regressors(X, y, n_rounds=3):
             Pipeline(
                 [
                     ("preprocess", preprocessor),
-                    ("model", ExtraTreesRegressor(random_state=42)),
+                    ("model", ExtraTreesRegressor(random_state=RANDOM_SEED)),
                 ]
             ),
             {
@@ -186,14 +141,17 @@ def test_regressors(X, y, n_rounds=3):
                 "model__min_samples_leaf": Integer(1, 50),
                 "model__max_features": Categorical(["sqrt", "log2", None]),
                 "model__bootstrap": Categorical([True, False]),
-                "model__criterion": ["absolute_error"],
+                "model__criterion": Categorical(["absolute_error"]),
             },
         ),
         "HistGradientBoostingRegressor": (
             Pipeline(
                 [
                     ("preprocess", preprocessor),
-                    ("model", HistGradientBoostingRegressor(random_state=42)),
+                    (
+                        "model",
+                        HistGradientBoostingRegressor(random_state=RANDOM_SEED),
+                    ),
                 ]
             ),
             {
@@ -204,17 +162,21 @@ def test_regressors(X, y, n_rounds=3):
                 "model__min_samples_leaf": Integer(5, 200),
                 "model__max_bins": Integer(32, 255),
                 "model__early_stopping": Categorical([False]),
-                "model__loss": ["absolute_error"],
+                "model__loss": Categorical(["absolute_error"]),
             },
         ),
     }
 
+
+def test_regressors(features, target, n_rounds=3):
+    models = build_models(features)
     results_path = "hyperparameters.json"
-    results: dict[str, dict] = {}
+    results = {}
+
     if os.path.exists(results_path):
         try:
-            with open(results_path, "r") as f:
-                results = json.load(f)
+            with open(results_path, "r", encoding="utf-8") as file:
+                results = json.load(file)
         except json.JSONDecodeError:
             print("Warning: invalid JSON, starting fresh.")
 
@@ -227,35 +189,39 @@ def test_regressors(X, y, n_rounds=3):
             search = BayesSearchCV(
                 model,
                 params,
-                n_iter=40,
-                cv=3,
+                n_iter=SEARCH_ITERATIONS,
+                cv=CV_FOLDS,
                 scoring="neg_mean_absolute_error",
-                n_jobs=10,
+                n_jobs=JOBS,
                 random_state=base_seed + round_idx,
                 verbose=1,
             )
-            search.fit(X, y)
-            best_score = search.best_score_
-            best_params = search.best_params_
+            search.fit(features, target)
 
-            prev_score = results.get(name, {}).get("best_score", -9999)
-            if best_score > prev_score:
-                print(f"↑ Improved: {best_score:.4f} > {prev_score:.4f}")
+            best_score = float(search.best_score_)
+            best_params = {
+                key.removeprefix("model__"): value
+                for key, value in search.best_params_.items()
+            }
+            previous_score = float(results.get(name, {}).get("best_score", -9999))
+
+            if best_score > previous_score:
+                print(f"Improved: {best_score:.4f} > {previous_score:.4f}")
                 results[name] = {"best_score": best_score, "best_params": best_params}
-                with open(results_path, "w") as f:
-                    json.dump(
-                        {k.removeprefix("model__"): v for k, v in results.items()},
-                        f,
-                        indent=4,
-                    )
-                print(f"Tried params: {best_params}")
+                with open(results_path, "w", encoding="utf-8") as file:
+                    json.dump(results, file, indent=4)
             else:
-                print(f"↓ No improvement ({best_score:.4f} ≤ {prev_score:.4f})")
-                print(f"Tried params: {best_params}")
+                print(f"No improvement ({best_score:.4f} <= {previous_score:.4f})")
+
+            print(f"Tried params: {best_params}")
 
     print(f"\nAll results saved to {results_path}")
     return results
 
 
-X, y = prepare_data("datasets/train.csv")
-test_regressors(X, y, n_rounds=1)
+if __name__ == "__main__":
+    X, y = prepare_data()
+    print(f"Training rows: {len(X)}")
+    print(f"Feature columns: {len(X.columns)}")
+    test_regressors(X, y, n_rounds=1)
+
