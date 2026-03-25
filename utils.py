@@ -39,6 +39,7 @@ class ProgressBar:
         self,
         total: int,
         start_at: int = 1,
+        update_every: int = 1,
         decimals: int = 1,
         length: int = 50,
         void: str = " ",
@@ -46,8 +47,13 @@ class ProgressBar:
         print_end: str = "\r",
         layout: list[str] = None,
     ) -> None:
+        if update_every < 1:
+            raise ValueError("update_every must be at least 1")
+
+        self.start_at = start_at
         self.iteration = start_at
         self.total = total
+        self.update_every = update_every
         self.decimals = decimals
         self.length = length
         self.void = void
@@ -96,11 +102,19 @@ class ProgressBar:
 
     def increment(self):
         self.iteration += 1
-        self.update()
+        if self.iteration > self.total or (self.iteration - self.start_at) % self.update_every == 0:
+            self.update()
 
     def clear_line(self):
         # print("\r" + " " * self.progress_bar_length, end="\r")
         print("\r" + " " * os.get_terminal_size().columns, end="\r")
 
     def finish(self):
+        if self._finished:
+            return
+
+        if self.iteration <= self.total:
+            self.update()
+
+        self._finished = True
         print()
