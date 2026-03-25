@@ -68,8 +68,6 @@ def load_main_dataset() -> Iterator[Row]:
 
             query = f"insert into {table_id} ({", ".join(keys)}) values ({", ".join("?" * len(keys))})"
 
-            print(query)
-
             db.execute(query, values)
 
             progress_bar.increment()
