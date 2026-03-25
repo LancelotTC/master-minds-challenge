@@ -79,7 +79,7 @@ def load_weather_data():
     import requests
 
     response = requests.get(
-        "https://archive-api.open-meteo.com/v1/archive?latitude=45.7589&longitude=4.8414&start_date=2023-01-01&end_date=2026-03-24&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,rain_sum,snowfall_sum,windspeed_10m_max&timezone=Europe%2FParis&format=csv"
+        "https://archive-api.open-meteo.com/v1/archive?latitude=45.7589&longitude=4.8414&start_date=2023-01-01&end_date=2026-03-24&daily=precipitation_sum,rain_sum,snowfall_sum,windspeed_10m_max&timezone=Europe%2FParis&format=csv"
     )
 
     with open("testing.csv", "w") as file:
