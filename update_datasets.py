@@ -50,7 +50,7 @@ def load_main_dataset() -> Iterator[Row]:
         with open(DATABASE_FILE, "w") as file:
             file.write("")
 
-        with open("creation_query.sql") as file:
+        with open(DATA_FOLDER / "creation_query.sql") as file:
             creation_query = file.read()
 
         with SqliteManager(DATABASE_FILE, True) as (db, connection):
