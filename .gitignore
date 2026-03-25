@@ -1,5 +1,15 @@
+# Exact files
 database.db
+creation_query.sql
+.env
+
+# Wildcard files
 *.pyc
 tempCodeRunnerFile.*
+*.db
+*.csv
+
+# Folders
 
 /eda_outputs
+/credentials
