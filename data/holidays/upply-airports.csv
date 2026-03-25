@@ -1,0 +1,612 @@
+code;name;latitude;longitude;country_code;zone_code
+AAL;Aalborg Airport;57.09275891;9.849243164;DK;EU
+AAP;Aji Pangeran Tumenggung Pranoto International Airport;-0.374448;117.249392;ID;AS
+ABQ;Albuquerque International Sunport;35.040199;-106.609001;US;NA
+ABV;Nnamdi Azikiwe International Airport;9.006790161;7.263169765;NG;AF
+ABZ;Aberdeen Dyce Airport;57.20190048;-2.197779894;GB;EU
+ACA;General Juan N Alvarez International Airport;16.75709915;-99.7539978;MX;NA
+ACC;Kotoka International Airport;5.6051898;-0.166786;GH;AF
+ADA;Adana Airport;36.98220062;35.28039932;TR;AS
+ADB;Adnan Menderes International Airport;38.29240036;27.15699959;TR;AS
+ADD;Addis Ababa Bole International Airport;8.977890015;38.79930115;ET;AF
+ADL;Adelaide International Airport;-34.945;138.531006;AU;OC
+ADW;Joint Base Andrews;38.810799;-76.866997;US;NA
+AER;Sochi International Airport;43.449902;39.9566;RU;EU
+AFW;Fort Worth Alliance Airport;32.98759842;-97.31880188;US;NA
+AGP;Malaga Airport;36.67490005;-4.499110222;ES;EU
+AGS;Augusta Regional At Bush Field;33.36989975;-81.96450043;US;NA
+AKL;Auckland International Airport;-37.0080986;174.7920074;NZ;OC
+AKT;RAF Akrotiri;34.590401;32.9879;GB;EU
+ALA;Almaty Airport;43.35210037;77.04049683;KZ;AS
+ALC;Alicante International Airport;38.28219986;-0.558156013;ES;EU
+ALG;Houari Boumediene Airport;36.69100189;3.215409994;DZ;AF
+ALP;Aleppo International Airport;36.18069839;37.22439957;SY;AS
+AMA;Rick Husband Amarillo International Airport;35.219398;-101.706001;US;NA
+AMM;Queen Alia International Airport;31.72260094;35.99319839;JO;AS
+AMS;Amsterdam Airport Schiphol;52.308601;4.76389;NL;EU
+ANC;Ted Stevens Anchorage International Airport;61.17440033;-149.9960022;US;NA
+ARN;Stockholm-Arlanda Airport;59.65190125;17.91860008;SE;EU
+ASB;Ashgabat International Airport;37.986801;58.361;TM;AS
+ATH;Eleftherios Venizelos International Airport;37.93640137;23.94449997;GR;EU
+ATL;Hartsfield Jackson Atlanta International Airport;33.6367;-84.428101;US;NA
+ATQ;Sri Guru Ram Dass Jee International Airport;31.70960045;74.79730225;IN;AS
+AUH;Abu Dhabi International Airport;24.43300056;54.65110016;AE;AS
+AUS;Austin Bergstrom International Airport;30.19449997;-97.66989899;US;NA
+AVL;Asheville Regional Airport;35.43619919;-82.54180145;US;NA
+AYT;Antalya International Airport;36.898701;30.800501;TR;AS
+BAB;Beale Air Force Base;39.13610077;-121.4369965;US;NA
+BAD;Barksdale Air Force Base;32.50180054;-93.66269684;US;NA
+BAH;Bahrain International Airport;26.27079964;50.63359833;BH;AS
+BCN;Barcelona International Airport;41.2971;2.07846;ES;EU
+BDL;Bradley International Airport;41.93889999;-72.68319702;US;NA
+BEG;Belgrade Nikola Tesla Airport;44.81840134;20.3090992;RS;EU
+BEL;Val de Cans/Julio Cezar Ribeiro International Airport;-1.37925005;-48.47629929;BR;SA
+BEY;Beirut Rafic Hariri International Airport;33.82089996;35.48839951;LB;AS
+BFI;Boeing Field King County International Airport;47.52999878;-122.302002;US;NA
+BFS;Belfast International Airport;54.65750122;-6.215829849;GB;EU
+BGO;Bergen Airport Flesland;60.29339981;5.218140125;NO;EU
+BGR;Bangor International Airport;44.80739975;-68.82810211;US;NA
+BGW;Baghdad International Airport;33.26250076;44.23460007;IQ;AS
+BGY;Il Caravaggio International Airport;45.673901;9.70417;IT;EU
+BHD;George Best Belfast City Airport;54.61809921;-5.872499943;GB;EU
+BHM;Birmingham-Shuttlesworth International Airport;33.56290054;-86.75350189;US;NA
+BHX;Birmingham International Airport;52.45389938;-1.748029947;GB;EU
+BIL;Billings Logan International Airport;45.80770111;-108.5429993;US;NA
+BJV;Milas Bodrum International Airport;37.25059891;27.66430092;TR;AS
+BKK;Suvarnabhumi Airport;13.68109989;100.7470016;TH;AS
+BKO;Modibo Keita International Airport;12.5335;-7.94994;ML;AF
+BLA;General Jose Antonio Anzoategui International Airport;10.111111;-64.692222;VE;SA
+BLL;Billund Airport;55.74029922;9.151780128;DK;EU
+BLQ;Bologna Guglielmo Marconi Airport;44.5354;11.2887;IT;EU
+BLR;Kempegowda International Airport;13.1979;77.706299;IN;AS
+BLV;Scott AFB/Midamerica Airport;38.5452;-89.835197;US;NA
+BMI;Central Illinois Regional Airport at Bloomington-Normal;40.47710037;-88.91590118;US;NA
+BNA;Nashville International Airport;36.12450027;-86.67819977;US;NA
+BNE;Brisbane International Airport;-27.38419914;153.1170044;AU;OC
+BOD;Bordeaux-Merignac Airport;44.82830048;-0.715556026;FR;EU
+BOG;El Dorado International Airport;4.70159;-74.1469;CO;SA
+BOH;Bournemouth Airport;50.77999878;-1.842499971;GB;EU
+BOI;Boise Air Terminal/Gowen Field;43.5644;-116.223;US;NA
+BOJ;Burgas Airport;42.56959915;27.51519966;BG;EU
+BOM;Chhatrapati Shivaji International Airport;19.08869934;72.86789703;IN;AS
+BOO;Bodo Airport;67.26920319;14.36530018;NO;EU
+BOS;General Edward Lawrence Logan International Airport;42.36429977;-71.00520325;US;NA
+BRE;Bremen Airport;53.04750061;8.786669731;DE;EU
+BRI;Bari Karol Wojtyla Airport;41.138901;16.760599;IT;EU
+BRS;Bristol Airport;51.382702;-2.71909;GB;EU
+BRU;Brussels Airport;50.90140152;4.48443985;BE;EU
+BSB;Presidente Juscelino Kubistschek International Airport;-15.86916733;-47.92083359;BR;SA
+BSL;EuroAirport Basel-Mulhouse-Freiburg Airport;47.59;7.529167;FR;EU
+BSR;Basrah International Airport;30.54910088;47.66210175;IQ;AS
+BTS;M. R. Stefanik Airport;48.17020035;17.21269989;SK;EU
+BUD;Budapest Liszt Ferenc International Airport;47.42976;19.261093;HU;EU
+BUF;Buffalo Niagara International Airport;42.94049835;-78.73220062;US;NA
+BWI;Baltimore/Washington International Thurgood Marshall Airport;39.1754;-76.668297;US;NA
+BWN;Brunei International Airport;4.944200039;114.9280014;BN;AS
+BZE;Philip S. W. Goldson International Airport;17.53910065;-88.30819702;BZ;NA
+BZZ;RAF Brize Norton;51.75;-1.58362;GB;EU
+CAE;Columbia Metropolitan Airport;33.93880081;-81.11949921;US;NA
+CAG;Cagliari Elmas Airport;39.251499;9.05428;IT;EU
+CAI;Cairo International Airport;30.12190056;31.40559959;EG;AF
+CAN;Guangzhou Baiyun International Airport;23.39240074;113.2990036;CN;AS
+CBM;Columbus Air Force Base;33.64379883;-88.44380188;US;NA
+CBR;Canberra International Airport;-35.30690002;149.1950073;AU;OC
+CCJ;Calicut International Airport;11.13679981;75.95529938;IN;AS
+CCS;Simon Bolivar International Airport;10.601194;-66.991222;VE;SA
+CCU;Netaji Subhash Chandra Bose International Airport;22.65469933;88.44670105;IN;AS
+CDG;Charles de Gaulle International Airport;49.012798;2.55;FR;EU
+CEB;Mactan Cebu International Airport;10.30749989;123.9789963;PH;AS
+CGH;Congonhas Airport;-23.62611008;-46.65638733;BR;SA
+CGK;Soekarno-Hatta International Airport;-6.12556982;106.6559982;ID;AS
+CGN;Cologne Bonn Airport;50.86589813;7.142739773;DE;EU
+CGO;Zhengzhou Xinzheng International Airport;34.5196991;113.8410034;CN;AS
+CGY;Laguindingan Airport;8.612203;124.456496;PH;AS
+CHA;Lovell Field;35.03530121;-85.20379639;US;NA
+CHC;Christchurch International Airport;-43.48939896;172.5319977;NZ;OC
+CHS;Charleston Air Force Base-International Airport;32.89860153;-80.04049683;US;NA
+CIA;Ciampino-G. B. Pastine International Airport;41.7994;12.5949;IT;EU
+CID;The Eastern Iowa Airport;41.88470078;-91.71080017;US;NA
+CJJ;Cheongju International Airport/Cheongju Air Base (K-59/G-513);36.717008;127.498741;KR;AS
+CJU;Jeju International Airport;33.51129913;126.4929962;KR;AS
+CKG;Chongqing Jiangbei International Airport;29.71920013;106.6419983;CN;AS
+CLE;Cleveland Hopkins International Airport;41.4117012;-81.84980011;US;NA
+CLT;Charlotte Douglas International Airport;35.2140007;-80.94309998;US;NA
+CMB;Bandaranaike International Colombo Airport;7.180759907;79.88410187;LK;AS
+CMH;John Glenn Columbus International Airport;39.998001;-82.891899;US;NA
+CMN;Mohammed V International Airport;33.36750031;-7.589970112;MA;AF
+CNF;Tancredo Neves International Airport;-19.62444305;-43.9719429;BR;SA
+CNX;Chiang Mai International Airport;18.76679993;98.96260071;TH;AS
+COK;Cochin International Airport;10.152;76.401901;IN;AS
+COS;City of Colorado Springs Municipal Airport;38.805801;-104.700996;US;NA
+CPH;Copenhagen Kastrup Airport;55.61790085;12.65600014;DK;EU
+CPT;Cape Town International Airport;-33.96480179;18.60169983;ZA;AF
+CRK;Diosdado Macapagal International Airport;15.186;120.559998;PH;AS
+CRL;Brussels South Charleroi Airport;50.459202;4.45382;BE;EU
+CRP;Corpus Christi International Airport;27.77039909;-97.50119781;US;NA
+CRW;Yeager Airport;38.37310028;-81.59320068;US;NA
+CSX;Changsha Huanghua International Airport;28.18919945;113.2200012;CN;AS
+CTA;Catania-Fontanarossa Airport;37.466801;15.0664;IT;EU
+CTS;New Chitose Airport;42.77519989;141.6920013;JP;AS
+CTU;Chengdu Shuangliu International Airport;30.57850075;103.9469986;CN;AS
+CUN;Cancun International Airport;21.03650093;-86.87709808;MX;NA
+CUZ;Alejandro Velasco Astete International Airport;-13.53569984;-71.938797;PE;SA
+CVG;Cincinnati Northern Kentucky International Airport;39.048801;-84.667801;US;NA
+CVS;Cannon Air Force Base;34.38280106;-103.3219986;US;NA
+CWB;Afonso Pena Airport;-25.5284996;-49.17580032;BR;SA
+CWL;Cardiff International Airport;51.39670181;-3.343329906;GB;EU
+DAB;Daytona Beach International Airport;29.179899;-81.058098;US;NA
+DAC;Hazrat Shahjalal International Airport;23.843347;90.397783;BD;AS
+DAD;Da Nang International Airport;16.04389954;108.1989975;VN;AS
+DAL;Dallas Love Field;32.847099;-96.851799;US;NA
+DAM;Damascus International Airport;33.41149902;36.5155983;SY;AS
+DAR;Julius Nyerere International Airport;-6.87811;39.202599;TZ;AF
+DAY;James M Cox Dayton International Airport;39.90240097;-84.2193985;US;NA
+DBQ;Dubuque Regional Airport;42.40200043;-90.70950317;US;NA
+DCA;Ronald Reagan Washington National Airport;38.8521;-77.037697;US;NA
+DEL;Indira Gandhi International Airport;28.5665;77.103104;IN;AS
+DEN;Denver International Airport;39.86169815;-104.6729965;US;NA
+DFW;Dallas Fort Worth International Airport;32.896801;-97.038002;US;NA
+DJJ;Sentani International Airport;-2.576950073;140.5160065;ID;AS
+DKR;Leopold Sedar Senghor International Airport;14.73970032;-17.49020004;SN;AF
+DLC;Zhoushuizi Airport;38.96569824;121.5390015;CN;AS
+DLF;DLF Airport;29.359501;-100.778002;US;NA
+DLH;Duluth International Airport;46.84209824;-92.19360352;US;NA
+DLM;Dalaman International Airport;36.71310043;28.79249954;TR;AS
+DME;Domodedovo International Airport;55.40879822;37.90629959;RU;EU
+DMK;Don Mueang International Airport;13.91259956;100.6070023;TH;AS
+DMM;King Fahd International Airport;26.47120094;49.79790115;SA;AS
+DOH;Hamad International Airport;25.273056;51.608056;QA;AS
+DOV;Dover Air Force Base;39.12950134;-75.46600342;US;NA
+DPS;Ngurah Rai (Bali) International Airport;-8.748169899;115.1669998;ID;AS
+DQM;Duqm International Airport;19.501944;57.634167;OM;AS
+DRS;Dresden Airport;51.13280106;13.76720047;DE;EU
+DSA;Robin Hood Doncaster Sheffield Airport;53.48053781;-1.010656357;GB;EU
+DSM;Des Moines International Airport;41.5340004;-93.6631012;US;NA
+DSS;Blaise Diagne International Airport;14.67;-17.073333;SN;AF
+DTM;Dortmund Airport;51.5182991;7.612239838;DE;EU
+DTW;Detroit Metropolitan Wayne County Airport;42.21239853;-83.35340118;US;NA
+DUB;Dublin Airport;53.421299;-6.27007;IE;EU
+DUR;King Shaka International Airport;-29.61444444;31.11972222;ZA;AF
+DUS;Dusseldorf Airport;51.289501;6.76678;DE;EU
+DVO;Francisco Bangoy International Airport;7.125520229;125.6460037;PH;AS
+DWC;Al Maktoum International Airport;24.896356;55.161389;AE;AS
+DXB;Dubai International Airport;25.25279999;55.36439896;AE;AS
+DYS;Dyess Air Force Base;32.42079926;-99.854599;US;NA
+EBB;Entebbe International Airport;0.042386;32.443501;UG;AF
+EDI;Edinburgh Airport;55.95000076;-3.372499943;GB;EU
+EDW;Edwards Air Force Base;34.905399;-117.884003;US;NA
+EIN;Eindhoven Airport;51.45009995;5.374529839;NL;EU
+EMA;East Midlands Airport;52.83110046;-1.328060031;GB;EU
+END;Vance Air Force Base;36.33919907;-97.91649628;US;NA
+ERI;Erie International Tom Ridge Field;42.08312701;-80.17386675;US;NA
+ERZ;Erzurum International Airport;39.95650101;41.17020035;TR;AS
+ESB;Esenboga International Airport;40.12810135;32.99509811;TR;AS
+EVN;Zvartnots International Airport;40.14730072;44.39590073;AM;EU
+EWR;Newark Liberty International Airport;40.69250107;-74.16870117;US;NA
+EXT;Exeter International Airport;50.7344017;-3.413889885;GB;EU
+EZE;Ministro Pistarini International Airport;-34.8222;-58.5358;AR;SA
+FAI;Fairbanks International Airport;64.81510162;-147.8560028;US;NA
+FAO;Faro Airport;37.01440048;-7.965909958;PT;EU
+FCO;Leonardo da Vinci-Fiumicino Airport;41.8002778;12.2388889;IT;EU
+FFD;RAF Fairford;51.68220139;-1.790030003;GB;EU
+FFO;Wright-Patterson Air Force Base;39.8260994;-84.0483017;US;NA
+FIH;Ndjili International Airport;-4.38575;15.4446;CD;AF
+FKB;Karlsruhe Baden-Baden Airport;48.77939987;8.080499649;DE;EU
+FLL;Fort Lauderdale Hollywood International Airport;26.072599;-80.152702;US;NA
+FLN;Hercilio Luz International Airport;-27.67027855;-48.55250168;BR;SA
+FMO;Munster Osnabruck Airport;52.13460159;7.684830189;DE;EU
+FNA;Lungi International Airport;8.61644;-13.1955;SL;AF
+FOC;Fuzhou Changle International Airport;25.93510056;119.663002;CN;AS
+FRA;Frankfurt am Main Airport;50.033333;8.570556;DE;EU
+FRU;Manas International Airport;43.06129837;74.4776001;KG;AS
+FSM;Fort Smith Regional Airport;35.33660126;-94.36740112;US;NA
+FSZ;Mt. Fuji Shizuoka Airport;34.79604347;138.1877518;JP;AS
+FTW;Fort Worth Meacham International Airport;32.819801;-97.362396;US;NA
+FUK;Fukuoka Airport;33.58589935;130.451004;JP;AS
+FWA;Fort Wayne International Airport;40.97850037;-85.19509888;US;NA
+GBE;Sir Seretse Khama International Airport;-24.555201;25.9182;BW;AF
+GCM;Owen Roberts International Airport;19.2928009;-81.35769653;KY;NA
+GDL;Don Miguel Hidalgo Y Costilla International Airport;20.52179909;-103.310997;MX;NA
+GDN;Gdansk Lech Walesa Airport;54.37760162;18.46619987;PL;EU
+GEG;Spokane International Airport;47.61989975;-117.5339966;US;NA
+GIG;Rio Galeao - Tom Jobim International Airport;-22.80999947;-43.25055695;BR;SA
+GLA;Glasgow International Airport;55.871899;-4.43306;GB;EU
+GMP;Gimpo International Airport;37.5583;126.791;KR;AS
+GOA;Genoa Cristoforo Colombo Airport;44.4133;8.8375;IT;EU
+GOI;Dabolim Airport;15.38080025;73.83139801;IN;AS
+GOT;Gothenburg-Landvetter Airport;57.66279984;12.27980042;SE;EU
+GPT;Gulfport Biloxi International Airport;30.40730095;-89.07009888;US;NA
+GRB;Austin Straubel International Airport;44.48509979;-88.12960052;US;NA
+GRJ;George Airport;-34.0056;22.378902;ZA;AF
+GRU;Guarulhos - Governador Andre Franco Montoro International Airport;-23.43555641;-46.47305679;BR;SA
+GRV;Grozny North Airport;43.388302;45.698601;RU;EU
+GSB;Seymour Johnson Air Force Base;35.33940125;-77.96060181;US;NA
+GSO;Piedmont Triad International Airport;36.09780121;-79.93730164;US;NA
+GSP;Greenville Spartanburg International Airport;34.89569855;-82.21890259;US;NA
+GUA;La Aurora Airport;14.5833;-90.527496;GT;NA
+GUM;Antonio B. Won Pat International Airport;13.48340034;144.7960052;GU;OC
+GUS;Grissom Air Reserve Base;40.64810181;-86.15209961;US;NA
+GVA;Geneva Cointrin International Airport;46.23809814;6.108950138;CH;EU
+GYD;Heydar Aliyev International Airport;40.46749878;50.04669952;AZ;EU
+GZT;Gaziantep International Airport;36.94720078;37.47869873;TR;AS
+HAJ;Hannover Airport;52.46110153;9.685079575;DE;EU
+HAK;Haikou Meilan International Airport;19.93490028;110.4589996;CN;AS
+HAM;Hamburg Airport;53.63040161;9.988229752;DE;EU
+HAN;Noi Bai International Airport;21.22120094;105.8069992;VN;AS
+HAV;Jose Marti International Airport;22.98920059;-82.40910339;CU;NA
+HEL;Helsinki Vantaa Airport;60.31719971;24.9633007;FI;EU
+HER;Heraklion International Nikos Kazantzakis Airport;35.33969879;25.18029976;GR;EU
+HET;Baita International Airport;40.851398;111.823997;CN;AS
+HGA;Egal International Airport;9.513207;44.082389;SO;AF
+HGH;Hangzhou Xiaoshan International Airport;30.22949982;120.4339981;CN;AS
+HIB;Range Regional Airport;47.38660049;-92.83899689;US;NA
+HKG;Hong Kong International Airport;22.308901;113.915001;HK;AS
+HKT;Phuket International Airport;8.1132;98.316902;TH;AS
+HMN;Holloman Air Force Base;32.85250092;-106.1070023;US;NA
+HMO;General Ignacio P. Garcia International Airport;29.09589958;-111.0479965;MX;NA
+HND;Tokyo Haneda International Airport;35.552299;139.779999;JP;AS
+HNL;Daniel K Inouye International Airport;21.32062;-157.924228;US;NA
+HOU;William P Hobby Airport;29.64539909;-95.27890015;US;NA
+HRB;Taiping Airport;45.62340164;126.25;CN;AS
+HRE;Robert Gabriel Mugabe International Airport;-17.931801;31.0928;ZW;AF
+HRG;Hurghada International Airport;27.17830086;33.79940033;EG;AF
+HRK;Kharkiv International Airport;49.92480087;36.29000092;UA;EU
+HSV;Huntsville International Carl T Jones Field;34.6371994;-86.77510071;US;NA
+HTS;Tri-State/Milton J. Ferguson Field;38.36669922;-82.55799866;US;NA
+HYD;Rajiv Gandhi International Airport;17.231318;78.429855;IN;AS
+IAD;Washington Dulles International Airport;38.94449997;-77.45580292;US;NA
+IAH;George Bush Intercontinental Houston Airport;29.9843998;-95.34140015;US;NA
+ICN;Incheon International Airport;37.46910095;126.4509964;KR;AS
+ICT;Wichita Eisenhower National Airport;37.649899;-97.433098;US;NA
+IKA;Imam Khomeini International Airport;35.41609955;51.15219879;IR;AS
+IND;Indianapolis International Airport;39.7173;-86.294403;US;NA
+ISB;Islamabad International Airport;33.549;72.82566;PK;AS
+ISE;Suleyman Demirel International Airport;37.85540009;30.36840057;TR;AS
+ISL;Ataturk International Airport;40.976898;28.8146;TR;AS
+IST;Istanbul Airport;41.275278;28.751944;TR;AS
+ITM;Osaka International Airport;34.78549957;135.4380035;JP;AS
+JAN;Jackson-Medgar Wiley Evers International Airport;32.31119919;-90.07589722;US;NA
+JAX;Jacksonville International Airport;30.49410057;-81.68789673;US;NA
+JED;King Abdulaziz International Airport;21.6796;39.156502;SA;AS
+JFK;John F Kennedy International Airport;40.639801;-73.7789;US;NA
+JLN;Joplin Regional Airport;37.15179825;-94.49829865;US;NA
+JNB;OR Tambo International Airport;-26.1392;28.246;ZA;AF
+JUB;Juba International Airport;4.872010231;31.60110092;SS;AF
+KAN;Mallam Aminu International Airport;12.0476;8.52462;NG;AF
+KBP;Boryspil International Airport;50.34500122;30.8946991;UA;EU
+KEF;Keflavik International Airport;63.985001;-22.6056;IS;EU
+KGF;Sary-Arka Airport;49.67079926;73.33439636;KZ;AS
+KGL;Kigali International Airport;-1.96863;30.1395;RW;AF
+KHH;Kaohsiung International Airport;22.57710075;120.3499985;TW;AS
+KHI;Jinnah International Airport;24.9065;67.1608;PK;AS
+KHV;Khabarovsk-Novy Airport;48.52799988;135.1880035;RU;EU
+KIN;Norman Manley International Airport;17.93569946;-76.78749847;JM;NA
+KIX;Kansai International Airport;34.4272995;135.2440033;JP;AS
+KJA;Yemelyanovo Airport;56.172901;92.493301;RU;EU
+KMG;Kunming Changshui International Airport;25.1019444;102.9291667;CN;AS
+KNH;Kinmen Airport;24.4279;118.359001;TW;AS
+KOJ;Kagoshima Airport;31.80340004;130.7189941;JP;AS
+KRK;Krakow John Paul II International Airport;50.077702;19.7848;PL;EU
+KRT;Khartoum International Airport;15.58950043;32.55319977;SD;AF
+KTM;Tribhuvan International Airport;27.6966;85.3591;NP;AS
+KTW;Katowice International Airport;50.4743;19.08;PL;EU
+KUF;Kurumoch International Airport;53.50490189;50.16429901;RU;EU
+KUL;Kuala Lumpur International Airport;2.745579958;101.7099991;MY;AS
+KUV;Kunsan Air Base;35.90380096;126.6159973;KR;AS
+KWE;Longdongbao Airport;26.53849983;106.8010025;CN;AS
+KWI;Kuwait International Airport;29.22660065;47.96889877;KW;AS
+KWL;Guilin Liangjiang International Airport;25.21809959;110.0390015;CN;AS
+KZN;Kazan International Airport;55.60620117;49.27870178;RU;EU
+LAD;Quatro de Fevereiro Airport;-8.85837;13.2312;AO;AF
+LAS;McCarran International Airport;36.08010101;-115.1520004;US;NA
+LAX;Los Angeles International Airport;33.942501;-118.407997;US;NA
+LBA;Leeds Bradford Airport;53.86589813;-1.660570025;GB;EU
+LBB;Lubbock Preston Smith International Airport;33.663601;-101.822998;US;NA
+LCA;Larnaca International Airport;34.87509918;33.62490082;CY;AS
+LCK;Rickenbacker International Airport;39.813801;-82.927803;US;NA
+LED;Pulkovo Airport;59.8003006;30.26250076;RU;EU
+LEJ;Leipzig/Halle Airport;51.423889;12.236389;DE;EU
+LEX;Blue Grass Airport;38.03649902;-84.60590363;US;NA
+LFI;Langley Air Force Base;37.082901;-76.36049652;US;NA
+LFT;Lafayette Regional Airport;30.20529938;-91.98760223;US;NA
+LGA;La Guardia Airport;40.777199;-73.872597;US;NA
+LGG;Liege Airport;50.63740158;5.443220139;BE;EU
+LGW;London Gatwick Airport;51.148102;-0.190278;GB;EU
+LHE;Allama Iqbal International Airport;31.5196;74.406;PK;AS
+LHR;London Heathrow Airport;51.4706;-0.461941;GB;EU
+LIM;Jorge Chavez International Airport;-12.0219;-77.114305;PE;SA
+LIN;Milano Linate Airport;45.445099;9.27674;IT;EU
+LIR;Daniel Oduber Quiros International Airport;10.5933;-85.544403;CR;NA
+LIS;Humberto Delgado Airport (Lisbon Portela Airport);38.7813;-9.13592;PT;EU
+LIT;Bill & Hillary Clinton National Airport/Adams Field;34.72940063;-92.22429657;US;NA
+LJU;Ljubljana Joze Pucnik Airport;46.223701;14.4576;SI;EU
+LKZ;RAF Lakenheath;52.40930176;0.56099999;GB;EU
+LLA;Lulea Airport;65.54380035;22.12199974;SE;EU
+LOS;Murtala Muhammed International Airport;6.577370167;3.321160078;NG;AF
+LPA;Gran Canaria Airport;27.93190002;-15.38659954;ES;EU
+LPL;Liverpool John Lennon Airport;53.33359909;-2.849720001;GB;EU
+LTK;Bassel Al-Assad International Airport;35.40110016;35.94869995;SY;AS
+LTN;London Luton Airport;51.87469864;-0.368333012;GB;EU
+LTS;Altus Air Force Base;34.667099;-99.26670074;US;NA
+LTX;Cotopaxi International Airport;-0.906833;-78.615799;EC;SA
+LUF;Luke Air Force Base;33.53499985;-112.3830032;US;NA
+LUN;Kenneth Kaunda International Airport;-15.3308;28.4526;ZM;AF
+LUX;Luxembourg-Findel International Airport;49.6233333;6.2044444;LU;EU
+LXR;Luxor International Airport;25.671;32.7066;EG;AF
+LYS;Lyon Saint-Exupery Airport;45.725556;5.081111;FR;EU
+MAA;Chennai International Airport;12.99000549;80.16929626;IN;AS
+MAD;Adolfo Suarez Madrid-Barajas Airport;40.471926;-3.56264;ES;EU
+MAN;Manchester Airport;53.35369873;-2.274950027;GB;EU
+MAO;Eduardo Gomes International Airport;-3.03861;-60.049702;BR;SA
+MBA;Mombasa Moi International Airport;-4.034830093;39.59420013;KE;AF
+MBS;MBS International Airport;43.53290176;-84.07959747;US;NA
+MCF;Mac Dill Air Force Base;27.84930038;-82.52120209;US;NA
+MCI;Kansas City International Airport;39.2976;-94.713898;US;NA
+MCO;Orlando International Airport;28.42939949;-81.30899811;US;NA
+MCT;Muscat International Airport;23.59329987;58.28440094;OM;AS
+MDL;Mandalay International Airport;21.70219994;95.97789764;MM;AS
+MDW;Chicago Midway International Airport;41.785999;-87.752403;US;NA
+MED;Prince Mohammad Bin Abdulaziz Airport;24.5534;39.705101;SA;AS
+MEL;Melbourne International Airport;-37.673302;144.843002;AU;OC
+MEM;Memphis International Airport;35.04240036;-89.97669983;US;NA
+MEX;Licenciado Benito Juarez International Airport;19.4363;-99.072098;MX;NA
+MFM;Macau International Airport;22.149599;113.592003;MO;AS
+MGE;Dobbins Air Reserve Base;33.91540146;-84.51629639;US;NA
+MGM;Montgomery Regional (Dannelly Field) Airport;32.30059814;-86.39399719;US;NA
+MHD;Mashhad International Airport;36.23519897;59.64099884;IR;AS
+MHT;Manchester-Boston Regional Airport;42.932598;-71.435699;US;NA
+MHZ;RAF Mildenhall;52.36190033;0.486405998;GB;EU
+MIA;Miami International Airport;25.79319954;-80.29060364;US;NA
+MKE;General Mitchell International Airport;42.94720078;-87.89659882;US;NA
+MLA;Malta International Airport;35.857498;14.4775;MT;EU
+MLE;Male International Airport;4.191830158;73.52909851;MV;AS
+MLI;Quad City International Airport;41.44850159;-90.50749969;US;NA
+MLU;Monroe Regional Airport;32.51089859;-92.03769684;US;NA
+MMX;Malmo Sturup Airport;55.53630536;13.37619781;SE;EU
+MNH;Rustaq Airport;23.640556;57.4875;OM;AS
+MNL;Ninoy Aquino International Airport;14.5086;121.019997;PH;AS
+MOB;Mobile Regional Airport;30.69120026;-88.24279785;US;NA
+MPM;Maputo Airport;-25.920799;32.572601;MZ;AF
+MRS;Marseille Provence Airport;43.43927192;5.221424103;FR;EU
+MRU;Sir Seewoosagur Ramgoolam International Airport;-20.430201;57.683601;MU;AF
+MSN;Dane County Regional Truax Field;43.13990021;-89.33750153;US;NA
+MSP;Minneapolis-St Paul International/Wold-Chamberlain Airport;44.882;-93.221802;US;NA
+MSQ;Minsk National Airport;53.88249969;28.03070068;BY;EU
+MSY;Louis Armstrong New Orleans International Airport;29.99340057;-90.25800323;US;NA
+MTY;General Mariano Escobedo International Airport;25.7784996;-100.1070023;MX;NA
+MUC;Munich Airport;48.353802;11.7861;DE;EU
+MUO;Mountain Home Air Force Base;43.043598;-115.872002;US;NA
+MVD;Carrasco International /General C L Berisso Airport;-34.838402;-56.0308;UY;SA
+MWX;Muan International Airport;34.991406;126.382814;KR;AS
+MXP;Malpensa International Airport;45.6306;8.72811;IT;EU
+NAP;Naples International Airport;40.886002;14.2908;IT;EU
+NAS;Lynden Pindling International Airport;25.039;-77.466202;BS;NA
+NAT;Governador Aluizio Alves International Airport;-5.768056;-35.376111;BR;SA
+NAY;Beijing Nanyuan Airport;39.78279877;116.3880005;CN;AS
+NBE;Enfidha - Hammamet International Airport;36.075833;10.438611;TN;AF
+NBO;Jomo Kenyatta International Airport;-1.319239974;36.92779922;KE;AF
+NCE;Nice-Cote d'Azur Airport;43.65840149;7.215869904;FR;EU
+NCL;Newcastle Airport;55.03749847;-1.691669941;GB;EU
+NDJ;N'Djamena International Airport;12.1337;15.034;TD;AF
+NGB;Ningbo Lishe International Airport;29.82670021;121.461998;CN;AS
+NGO;Chubu Centrair International Airport;34.85839844;136.8049927;JP;AS
+NIM;Diori Hamani International Airport;13.4815;2.18361;NE;AF
+NKC;Nouakchott-Oumtounsy International Airport;18.31;-15.9697222;MR;AF
+NKG;Nanjing Lukou Airport;31.74200058;118.8619995;CN;AS
+NLU;Felipe Angeles International Airport;19.35;-99.1167;MX;NA
+NNG;Nanning Wuxu Airport;22.60829926;108.1719971;CN;AS
+NRT;Narita International Airport;35.764702;140.386002;JP;AS
+NUE;Nuremberg Airport;49.498699;11.078056;DE;EU
+NWI;Norwich International Airport;52.67580032;1.282780051;GB;EU
+OAK;Metropolitan Oakland International Airport;37.721298;-122.221001;US;NA
+ODS;Odessa International Airport;46.42679977;30.67650032;UA;EU
+OKA;Naha Airport;26.19580078;127.6460037;JP;AS
+OKC;Will Rogers World Airport;35.39310074;-97.60070038;US;NA
+OKO;Yokota Air Base;35.74850082;139.3480072;JP;AS
+OMA;Eppley Airfield;41.3032;-95.894096;US;NA
+ONT;Ontario International Airport;34.05599976;-117.6009979;US;NA
+OPO;Francisco de Sa Carneiro Airport;41.24810028;-8.681389809;PT;EU
+ORD;Chicago O'Hare International Airport;41.9786;-87.9048;US;NA
+ORF;Norfolk International Airport;36.89459991;-76.20120239;US;NA
+ORK;Cork Airport;51.84130096;-8.491109848;IE;EU
+ORY;Paris-Orly Airport;48.7233333;2.3794444;FR;EU
+OSL;Oslo Gardermoen Airport;60.19390106;11.10039997;NO;EU
+OTP;Henri Coanda International Airport;44.5711111;26.085;RO;EU
+OUA;Ouagadougou Airport;12.3532;-1.51242;BF;AF
+OVB;Tolmachevo Airport;55.01259995;82.65070343;RU;EU
+PAM;Tyndall Air Force Base;30.06959915;-85.57540131;US;NA
+PBI;Palm Beach International Airport;26.68320084;-80.09559631;US;NA
+PDL;Joao Paulo II Airport;37.74119949;-25.69790077;PT;EU
+PDX;Portland International Airport;45.58869934;-122.5979996;US;NA
+PEK;Beijing Capital International Airport;40.08010101;116.5849991;CN;AS
+PEN;Penang International Airport;5.29714;100.277;MY;AS
+PER;Perth International Airport;-31.94029999;115.9670029;AU;OC
+PFO;Paphos International Airport;34.7179985;32.4856987;CY;AS
+PHF;Newport News Williamsburg International Airport;37.13190079;-76.49299622;US;NA
+PHL;Philadelphia International Airport;39.87189865;-75.2410965;US;NA
+PHX;Phoenix Sky Harbor International Airport;33.43429947;-112.012001;US;NA
+PIA;General Wayne A. Downing Peoria International Airport;40.66419983;-89.69329834;US;NA
+PIT;Pittsburgh International Airport;40.49150085;-80.23290253;US;NA
+PKX;Beijing Daxing International Airport;39.509945;116.41092;CN;AS
+PMI;Palma De Mallorca Airport;39.55170059;2.738810062;ES;EU
+PMO;Falcone-Borsellino Airport;38.175999;13.091;IT;EU
+PNH;Phnom Penh International Airport;11.54660034;104.8440018;KH;AS
+POM;Port Moresby Jacksons International Airport;-9.443380356;147.2200012;PG;OC
+POZ;Poznan-Lawica Airport;52.42100143;16.82629967;PL;EU
+PPT;Faa'a International Airport;-17.553699;-149.606995;PF;OC
+PRG;Vaclav Havel Airport Prague;50.1008;14.26;CZ;EU
+PRN;Pristina International Airport;42.5728;21.035801;XK;
+PSA;Pisa International Airport;43.683899;10.3927;IT;EU
+PTP;Pointe-a-Pitre Le Raizet;16.265301;-61.531799;GP;NA
+PTY;Tocumen International Airport;9.071359634;-79.38349915;PA;NA
+PUJ;Punta Cana International Airport;18.56739998;-68.36340332;DO;NA
+PUS;Gimhae International Airport;35.17950058;128.9380035;KR;AS
+PVD;Theodore Francis Green State Airport;41.732601;-71.420403;US;NA
+PVG;Shanghai Pudong International Airport;31.14340019;121.8050003;CN;AS
+PVR;Licenciado Gustavo Diaz Ordaz International Airport;20.68009949;-105.2539978;MX;NA
+PWM;Portland International Jetport;43.646198;-70.309303;US;NA
+QRO;Queretaro Intercontinental Airport;20.6228;-100.369;MX;NA
+QUO;Akwa Ibom International Airport;4.8725;8.093;NG;AF
+RAR;Rarotonga International Airport;-21.20269966;-159.8059998;CK;OC
+RDU;Raleigh Durham International Airport;35.87760162;-78.78749847;US;NA
+REP;Siem Reap International Airport;13.41069984;103.8130035;KH;AS
+RFD;Chicago Rockford International Airport;42.19540024;-89.09719849;US;NA
+RGN;Yangon International Airport;16.90730095;96.1332016;MM;AS
+RIC;Richmond International Airport;37.50519943;-77.31970215;US;NA
+RIX;Riga International Airport;56.92359924;23.97109985;LV;EU
+RMS;Ramstein Air Base;49.43690109;7.600279808;DE;EU
+RND;Randolph Air Force Base;29.52969933;-98.27890015;US;NA
+RNO;Reno Tahoe International Airport;39.49909973;-119.7679977;US;NA
+ROA;Roanoke-Blacksburg Regional Airport;37.3255;-79.975403;US;NA
+ROB;Roberts International Airport;6.23379;-10.3623;LR;AF
+ROC;Greater Rochester International Airport;43.1189003;-77.67240143;US;NA
+ROV;Platov International Airport;47.493888;39.924722;RU;EU
+RST;Rochester International Airport;43.90829849;-92.5;US;NA
+RSW;Southwest Florida International Airport;26.53619957;-81.75520325;US;NA
+RUH;King Khaled International Airport;24.95759964;46.69879913;SA;AS
+SAL;Monsenor Oscar Arnulfo Romero International Airport;13.4409;-89.055702;SV;NA
+SAN;San Diego International Airport;32.73360062;-117.1900024;US;NA
+SAP;Ramon Villeda Morales International Airport;15.4525;-87.9233;HN;NA
+SAT;San Antonio International Airport;29.533701;-98.469803;US;NA
+SAV;Savannah Hilton Head International Airport;32.12760162;-81.20210266;US;NA
+SAW;Sabiha Gokcen International Airport;40.89860153;29.30920029;TR;AS
+SBN;South Bend Regional Airport;41.70869827;-86.31729889;US;NA
+SCL;Comodoro Arturo Merino Benitez International Airport;-33.39300156;-70.78579712;CL;SA
+SCQ;Santiago de Compostela Airport;42.89630127;-8.415140152;ES;EU
+SDF;Louisville Muhammad Ali International Airport;38.1744;-85.736;US;NA
+SDQ;Las Americas International Airport;18.42970085;-69.66889954;DO;NA
+SEA;Seattle Tacoma International Airport;47.449001;-122.308998;US;NA
+SEZ;Seychelles International Airport;-4.67434;55.521801;SC;AF
+SFB;Orlando Sanford International Airport;28.77759933;-81.23750305;US;NA
+SFO;San Francisco International Airport;37.61899948;-122.375;US;NA
+SGF;Springfield Branson National Airport;37.24570084;-93.38860321;US;NA
+SGN;Tan Son Nhat International Airport;10.81879997;106.6520004;VN;AS
+SHA;Shanghai Hongqiao International Airport;31.19790077;121.3359985;CN;AS
+SHE;Taoxian Airport;41.63980103;123.4830017;CN;AS
+SHJ;Sharjah International Airport;25.32859993;55.51720047;AE;AS
+SID;Amilcar Cabral International Airport;16.7414;-22.9494;CV;AF
+SIN;Singapore Changi Airport;1.35019;103.994003;SG;AS
+SIP;Simferopol International Airport;45.05220032;33.97510147;UA;EU
+SJC;Norman Y. Mineta San Jose International Airport;37.362598;-121.929001;US;NA
+SJD;Los Cabos International Airport;23.15180016;-109.7210007;MX;NA
+SJJ;Sarajevo International Airport;43.82460022;18.3314991;BA;EU
+SJO;Juan Santamaria International Airport;9.99361;-84.2089;CR;NA
+SJU;Luis Munoz Marin International Airport;18.43939972;-66.00180054;PR;NA
+SKA;Fairchild Air Force Base;47.61510086;-117.6559982;US;NA
+SKG;Thessaloniki Macedonia International Airport;40.5196991;22.97089958;GR;EU
+SKP;Skopje International Airport;41.961601;21.621401;MK;EU
+SKT;Sialkot Airport;32.53555679;74.3638916;PK;AS
+SLC;Salt Lake City International Airport;40.78839874;-111.9779968;US;NA
+SMF;Sacramento International Airport;38.69540024;-121.5910034;US;NA
+SNA;John Wayne Airport-Orange County Airport;33.67570114;-117.8679962;US;NA
+SNN;Shannon Airport;52.702;-8.92482;IE;EU
+SOF;Sofia Airport;42.69669342;23.41143608;BG;EU
+SOQ;Dominique Edward Osok Airport;-0.894;131.287;ID;AS
+SOU;Southampton Airport;50.95029831;-1.35679996;GB;EU
+SPC;La Palma Airport;28.626499;-17.7556;ES;EU
+SPI;Abraham Lincoln Capital Airport;39.84410095;-89.67790222;US;NA
+SPS;Sheppard Air Force Base-Wichita Falls Municipal Airport;33.9888;-98.491898;US;NA
+SRQ;Sarasota Bradenton International Airport;27.39539909;-82.55439758;US;NA
+SSA;Deputado Luiz Eduardo Magalhaes International Airport;-12.9086113;-38.32249832;BR;SA
+SSC;Shaw Air Force Base;33.97269821;-80.47059631;US;NA
+STL;St Louis Lambert International Airport;38.748697;-90.370003;US;NA
+STN;London Stansted Airport;51.88499832;0.234999999;GB;EU
+STR;Stuttgart Airport;48.68989944;9.221960068;DE;EU
+SUB;Juanda International Airport;-7.379829884;112.7870026;ID;AS
+SUS;Spirit of St Louis Airport;38.66210175;-90.65200043;US;NA
+SUU;Travis Air Force Base;38.26269913;-121.927002;US;NA
+SUX;Sioux Gateway Airport/Brigadier General Bud Day Field;42.402599;-96.384399;US;NA
+SVG;Stavanger Airport Sola;58.87670135;5.63778019;NO;EU
+SVO;Sheremetyevo International Airport;55.972599;37.4146;RU;EU
+SVX;Koltsovo Airport;56.74309921;60.80270004;RU;EU
+SXF;Berlin-Schonefeld Airport;52.380001;13.5225;DE;EU
+SXM;Princess Juliana International Airport;18.04100037;-63.10889816;SX;NA
+SYD;Sydney Kingsford Smith International Airport;-33.94609833;151.177002;AU;OC
+SYR;Syracuse Hancock International Airport;43.11119843;-76.10630035;US;NA
+SYX;Sanya Phoenix International Airport;18.30290031;109.4120026;CN;AS
+SYZ;Shiraz Shahid Dastghaib International Airport;29.5392;52.589802;IR;AS
+SZL;Whiteman Air Force Base;38.7303009;-93.54789734;US;NA
+SZX;Shenzhen Bao'an International Airport;22.63929939;113.810997;CN;AS
+TAS;Tashkent International Airport;41.25790024;69.28119659;UZ;AS
+TBS;Tbilisi International Airport;41.6692009;44.95470047;GE;EU
+TBZ;Tabriz International Airport;38.13389969;46.23500061;IR;AS
+TCM;McChord Air Force Base;47.13769913;-122.4759979;US;NA
+TER;Lajes Airport;38.761799;-27.090799;PT;EU
+TFN;Tenerife Norte Airport;28.48270035;-16.34149933;ES;EU
+TFS;Tenerife South Airport;28.04450035;-16.57250023;ES;EU
+TGD;Podgorica Airport;42.359402;19.2519;ME;EU
+THR;Mehrabad International Airport;35.68920135;51.31340027;IR;AS
+TIA;Tirana International Airport Mother Teresa;41.41469955;19.72060013;AL;EU
+TIJ;General Abelardo L. Rodriguez International Airport;32.54109955;-116.9700012;MX;NA
+TIK;Tinker Air Force Base;35.41469955;-97.38659668;US;NA
+TIP;Tripoli International Airport;32.66350174;13.1590004;LY;AF
+TLH;Tallahassee Regional Airport;30.39649963;-84.35030365;US;NA
+TLL;Lennart Meri Tallinn Airport;59.41329956;24.83279991;EE;EU
+TLS;Toulouse-Blagnac Airport;43.629101;1.36382;FR;EU
+TLV;Ben Gurion International Airport;32.01139832;34.88669968;IL;AS
+TNA;Yaoqiang Airport;36.85720062;117.2160034;CN;AS
+TNR;Ivato Airport;-18.7969;47.478802;MG;AF
+TOL;Toledo Express Airport;41.58679962;-83.80780029;US;NA
+TOS;Tromso Airport;69.6832962;18.91889954;NO;EU
+TPA;Tampa International Airport;27.97550011;-82.53320313;US;NA
+TPE;Taiwan Taoyuan International Airport;25.0777;121.233002;TW;AS
+TRD;Trondheim Airport Vaernes;63.4578018;10.9239998;NO;EU
+TRI;Tri-Cities Regional TN/VA Airport;36.475201;-82.407401;US;NA
+TRN;Turin Airport;45.200802;7.64963;IT;EU
+TRV;Trivandrum International Airport;8.48211956;76.92009735;IN;AS
+TSE;Astana International Airport;51.02220154;71.46690369;KZ;AS
+TSF;Treviso-Sant'Angelo Airport;45.648399;12.1944;IT;EU
+TSN;Tianjin Binhai International Airport;39.12440109;117.3460007;CN;AS
+TUL;Tulsa International Airport;36.19839859;-95.88809967;US;NA
+TUN;Tunis Carthage International Airport;36.85100174;10.22719955;TN;AF
+TUS;Tucson International Airport / Morris Air National Guard Base;32.115004;-110.938053;US;NA
+TXL;Berlin-Tegel Airport;52.5597;13.2877;DE;EU
+TYN;Taiyuan Wusu Airport;37.74689865;112.6279984;CN;AS
+TYS;McGhee Tyson Airport;35.81100082;-83.9940033;US;NA
+TZX;Trabzon International Airport;40.99509811;39.78969955;TR;AS
+UBN;Ulaanbaatar International Airport;47.646916;106.819833;MN;AS
+UFA;Ufa International Airport;54.55749893;55.87440109;RU;EU
+UIO;Mariscal Sucre International Airport;-0.129166667;-78.3575;EC;SA
+ULN;Buyant-Ukhaa International Airport;47.843102;106.766998;MN;AS
+UPG;Hasanuddin International Airport;-5.061629772;119.5540009;ID;AS
+URC;Urumqi Diwopu International Airport;43.90710068;87.47419739;CN;AS
+VAR;Varna Airport;43.232101;27.8251;BG;EU
+VBG;Vandenberg Air Force Base;34.73730087;-120.5839996;US;NA
+VCE;Venice Marco Polo Airport;45.505299;12.3519;IT;EU
+VCP;Viracopos International Airport;-23.0069;-47.1363;BR;SA
+VDA;Ovda International Airport;29.94029999;34.93579865;IL;AS
+VIE;Vienna International Airport;48.11029816;16.56970024;AT;EU
+VKO;Vnukovo International Airport;55.59149933;37.26150131;RU;EU
+VNO;Vilnius International Airport;54.634102;25.285801;LT;EU
+VPS;Destin-Ft Walton Beach Airport;30.4832;-86.525398;US;NA
+VRA;Juan Gualberto Gomez International Airport;23.03440094;-81.43530273;CU;NA
+VRN;Verona Villafranca Airport;45.395699;10.8885;IT;EU
+VVI;Viru Viru International Airport;-17.6448;-63.135399;BO;SA
+WAW;Warsaw Chopin Airport;52.16569901;20.96710014;PL;EU
+WDH;Hosea Kutako International Airport;-22.4799;17.4709;NA;AF
+WLG;Wellington International Airport;-41.32720184;174.8049927;NZ;OC
+WMI;Modlin Airport;52.451099;20.6518;PL;EU
+WNZ;Wenzhou Longwan International Airport;27.912201;120.851997;CN;AS
+WRB;Robins Air Force Base;32.64009857;-83.59190369;US;NA
+WRO;Copernicus Wroclaw Airport;51.10269928;16.88579941;PL;EU
+WUH;Wuhan Tianhe International Airport;30.7838;114.208;CN;AS
+XIY;Xi'an Xianyang International Airport;34.447102;108.751999;CN;AS
+XMN;Xiamen Gaoqi International Airport;24.54400063;118.1279984;CN;AS
+YEG;Edmonton International Airport;53.30970001;-113.5800018;CA;NA
+YHM;John C. Munro Hamilton International Airport;43.1731;-79.935;CA;NA
+YHZ;Halifax / Stanfield International Airport;44.88079834;-63.50859833;CA;NA
+YMX;Montreal-Mirabel International Airport;45.6797;-74.0386;CA;NA
+YNT;Yantai Penglai International Airport;37.657222;120.987222;CN;AS
+YOW;Ottawa Macdonald-Cartier International Airport;45.32249832;-75.66919708;CA;NA
+YUL;Montreal / Pierre Elliott Trudeau International Airport;45.47060013;-73.74079895;CA;NA
+YVR;Vancouver International Airport;49.19390106;-123.1839981;CA;NA
+YWG;Winnipeg / James Armstrong Richardson International Airport;49.90999985;-97.23989868;CA;NA
+YYC;Calgary International Airport;51.11389923;-114.0199966;CA;NA
+YYJ;Victoria International Airport;48.64690018;-123.4260025;CA;NA
+YYT;St. John's International Airport;47.61859894;-52.75189972;CA;NA
+YYZ;Lester B. Pearson International Airport;43.67720032;-79.63059998;CA;NA
+ZAG;Zagreb Airport;45.74290085;16.06879997;HR;EU
+ZAZ;Zaragoza Airport;41.6607;-1.0078;ES;EU
+ZIA;Zhukovsky International Airport;55.553299;38.150002;RU;EU
+ZNZ;Abeid Amani Karume International Airport;-6.22202;39.224899;TZ;AF
+ZRH;Zurich Airport;47.464699;8.54917;CH;EU
