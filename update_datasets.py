@@ -267,7 +267,6 @@ def merge_datasets():
     load_holiday_data()
 
 
-# --- Configuration et exécution du script ---
 if __name__ == "__main__":
     load_dotenv()
 

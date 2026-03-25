@@ -1,3 +1,21 @@
+# Uncomment this line if you want to use torch with CUDA support
+# --extra-index-url https://download.pytorch.org/whl/cu130
+
+# Credentials
 python-dotenv
+
+# Data
 matplotlib
+pandas
+
+# Machine Learning
+scikit-optimize
+xgboost
+catboost
+
+# Deep Learning
+torch
+
+
+# Misc
 requests
