@@ -6,6 +6,15 @@ creation_query.sql
 # Wildcard files
 *.pyc
 tempCodeRunnerFile.*
+
+# Exact files
+database.db
+creation_query.sql
+.env
+
+# Wildcard files
+*.pyc
+tempCodeRunnerFile.*
 *.db
 *.csv
 
@@ -14,3 +23,4 @@ tempCodeRunnerFile.*
 /data
 /eda_outputs
 /credentials
+/predictions
