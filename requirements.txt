@@ -12,6 +12,7 @@ pandas
 scikit-optimize
 xgboost
 catboost
+lightgbm
 
 prophet
 
