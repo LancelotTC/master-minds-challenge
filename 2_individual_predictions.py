@@ -96,10 +96,10 @@ if __name__ == "__main__":
         #         "allow_writing_files",
         #     ),
         # ),
-        # "XGBRegressor": XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"])),
-        "GradientBoostingRegressor": GradientBoostingRegressor(
-            **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
-        ),
+        "XGBRegressor": XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"])),
+        # "GradientBoostingRegressor": GradientBoostingRegressor(
+        #     **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
+        # ),
         # "HistGradientBoostingRegressor": HistGradientBoostingRegressor(
         #     **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
         # ),

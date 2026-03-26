@@ -20,29 +20,49 @@ NULL_LIKE_STRINGS = {"", "NULL", "NONE", "NAN", "NAT"}
 PREDICTION_MODE_MISSING_TARGET = "missing_target"
 PREDICTION_MODE_KNOWN_TARGET = "known_target"
 
-FEATURE_COLUMNS = [
+BASE_FEATURE_COLUMNS = [
     "IdAircraftType",
     "IdBusinessUnitType",
     "IdBusContactType",
     "airlineOACICode",
     "AirportPrevious",
     "ServiceCode",
-    "FlightNumberNormalized",  #
+    "FlightNumberNormalized",
     "LTScheduledDatetime",
-    "SysTerminal",  #
-    "NbOfSeats",  #
+    "Direction",
+    "SysTerminal",
+    "NbOfSeats",
     "day_of_week",
     "is_weekend",
     "season",
-    "dest_country",  #
+    "dest_country",
     "is_fr_public_holiday",
     "is_fr_school_holiday_zone_a",
     "is_dest_public_holiday",
     "is_dest_school_holiday",
-    "precipitation_sum",  #
-    "rain_sum",  #
-    "snowfall_sum",  #
-    "windspeed_10m_max",  #
+    "precipitation_sum",
+    "rain_sum",
+    "snowfall_sum",
+    "windspeed_10m_max",
+]
+
+ENGINEERED_FEATURE_COLUMNS = [
+    "month_of_year",
+    "hour_of_day",
+    "hour_sin",
+    "hour_cos",
+    "day_of_week_sin",
+    "day_of_week_cos",
+    "month_sin",
+    "month_cos",
+    "is_any_day_off",
+    "days_until_next_day_off",
+    "days_until_next_workday",
+]
+
+FEATURE_COLUMNS = [
+    *BASE_FEATURE_COLUMNS,
+    *ENGINEERED_FEATURE_COLUMNS,
 ]
 
 CATEGORICAL_FEATURE_COLUMNS = {
@@ -51,6 +71,7 @@ CATEGORICAL_FEATURE_COLUMNS = {
     "AirportPrevious",
     "ServiceCode",
     "FlightNumberNormalized",
+    "Direction",
     "SysTerminal",
     "season",
     "dest_country",
@@ -130,8 +151,9 @@ def replace_null_like_values(series: pd.Series) -> pd.Series:
 
 
 def to_object_string_series(series: pd.Series) -> pd.Series:
-    string_values = series.astype("string").replace({pd.NA: np.nan})
-    return string_values.astype("object")
+    string_values = series.astype("string")
+    object_values = string_values.astype("object")
+    return object_values.where(pd.notna(object_values), np.nan)
 
 
 def load_training_and_prediction_frames(
@@ -146,7 +168,7 @@ def load_training_and_prediction_frames(
     raw_dataframe = load_main_dataset_dataframe(limit=limit)
     feature_dataframe = build_feature_dataframe(raw_dataframe)
     target = pd.to_numeric(raw_dataframe[TARGET_COLUMN], errors="coerce")
-    complete_feature_mask = feature_dataframe[FEATURE_COLUMNS].notna().all(axis=1)
+    complete_feature_mask = pd.Series(True, index=feature_dataframe.index)
     discarded_feature_mask = ~complete_feature_mask
 
     print_dataset_debug_summary(raw_dataframe, target, complete_feature_mask)
@@ -157,7 +179,7 @@ def load_training_and_prediction_frames(
             discarded_feature_mask,
         )
 
-    training_mask = target.notna() & complete_feature_mask
+    training_mask = target.notna()
     training_features = feature_dataframe.loc[training_mask, FEATURE_COLUMNS].copy()
     training_target = target.loc[training_mask].astype(float)
 
@@ -166,7 +188,7 @@ def load_training_and_prediction_frames(
         prediction_mask = training_mask
         prediction_identifier_columns.append(TARGET_COLUMN)
     else:
-        prediction_mask = target.isna() & complete_feature_mask
+        prediction_mask = target.isna()
 
     prediction_identifiers = raw_dataframe.loc[prediction_mask, prediction_identifier_columns].copy()
     prediction_features = feature_dataframe.loc[
@@ -196,6 +218,10 @@ def build_feature_dataframe(raw_dataframe: pd.DataFrame) -> pd.DataFrame:
 
     for column_name in NUMERIC_FEATURE_COLUMNS:
         features[column_name] = pd.to_numeric(features[column_name], errors="coerce")
+
+    object_columns = features.select_dtypes(include=["object"]).columns
+    for column_name in object_columns:
+        features[column_name] = features[column_name].replace({pd.NA: np.nan})
 
     return features
 
