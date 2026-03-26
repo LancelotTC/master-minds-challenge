@@ -76,9 +76,9 @@ if __name__ == "__main__":
     results = load_hyperparameter_results()
 
     regressors = {
-        "DecisionTreeRegressor": DecisionTreeRegressor(
-            **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
-        ),
+        # "DecisionTreeRegressor": DecisionTreeRegressor(
+        #     **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
+        # ),
         # "RandomForestRegressor": RandomForestRegressor(
         #     **clean_model_params(results["RandomForestRegressor"]["best_params"])
         # ),
@@ -97,9 +97,9 @@ if __name__ == "__main__":
         #     ),
         # ),
         # "XGBRegressor": XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"])),
-        # "GradientBoostingRegressor": GradientBoostingRegressor(
-        #     **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
-        # ),
+        "GradientBoostingRegressor": GradientBoostingRegressor(
+            **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
+        ),
         # "HistGradientBoostingRegressor": HistGradientBoostingRegressor(
         #     **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
         # ),
