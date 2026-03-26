@@ -1,6 +1,7 @@
 from typing import Optional
 
 from catboost import CatBoostRegressor
+from lightgbm import LGBMRegressor
 from sklearn.ensemble import (
     ExtraTreesRegressor,
     GradientBoostingRegressor,
@@ -75,35 +76,57 @@ if __name__ == "__main__":
     )
     results = load_hyperparameter_results()
 
-    regressors = {
-        # "DecisionTreeRegressor": DecisionTreeRegressor(
-        #     **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
-        # ),
-        # "RandomForestRegressor": RandomForestRegressor(
-        #     **clean_model_params(results["RandomForestRegressor"]["best_params"])
-        # ),
-        # "ExtraTreesRegressor": ExtraTreesRegressor(**clean_model_params(results["ExtraTreesRegressor"]["best_params"])),
-        # "CatBoostRegressor": CatBoostRegressor(
-        #     loss_function="MAE",
-        #     verbose=False,
-        #     random_seed=42,
-        #     allow_writing_files=False,
-        #     **params_without(
-        #         clean_model_params(results["CatBoostRegressor"]["best_params"]),
-        #         "loss_function",
-        #         "verbose",
-        #         "random_seed",
-        #         "allow_writing_files",
-        #     ),
-        # ),
-        "XGBRegressor": XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"])),
-        # "GradientBoostingRegressor": GradientBoostingRegressor(
-        #     **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
-        # ),
-        # "HistGradientBoostingRegressor": HistGradientBoostingRegressor(
-        #     **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
-        # ),
-    }
+    regressors = {}
+
+    if "XGBRegressor" in results:
+        regressors["XGBRegressor"] = XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"]))
+
+    if "LGBMRegressor" in results:
+        regressors["LGBMRegressor"] = LGBMRegressor(
+            random_state=42,
+            objective="mae",
+            verbosity=-1,
+            force_col_wise=True,
+            **clean_model_params(results["LGBMRegressor"]["best_params"]),
+        )
+
+    # if "DecisionTreeRegressor" in results:
+    #     regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
+    #         **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
+    #     )
+    # if "RandomForestRegressor" in results:
+    #     regressors["RandomForestRegressor"] = RandomForestRegressor(
+    #         **clean_model_params(results["RandomForestRegressor"]["best_params"])
+    #     )
+    # if "ExtraTreesRegressor" in results:
+    #     regressors["ExtraTreesRegressor"] = ExtraTreesRegressor(
+    #         **clean_model_params(results["ExtraTreesRegressor"]["best_params"])
+    #     )
+    # if "CatBoostRegressor" in results:
+    #     regressors["CatBoostRegressor"] = CatBoostRegressor(
+    #         loss_function="MAE",
+    #         verbose=False,
+    #         random_seed=42,
+    #         allow_writing_files=False,
+    #         **params_without(
+    #             clean_model_params(results["CatBoostRegressor"]["best_params"]),
+    #             "loss_function",
+    #             "verbose",
+    #             "random_seed",
+    #             "allow_writing_files",
+    #         ),
+    #     )
+    # if "GradientBoostingRegressor" in results:
+    #     regressors["GradientBoostingRegressor"] = GradientBoostingRegressor(
+    #         **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
+    #     )
+    # if "HistGradientBoostingRegressor" in results:
+    #     regressors["HistGradientBoostingRegressor"] = HistGradientBoostingRegressor(
+    #         **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
+    #     )
+
+    if not regressors:
+        raise RuntimeError("No enabled regressors found in hyperparameters.json.")
 
     for name, model in regressors.items():
         predictions, validation_r2, validation_mae = get_predictions(
