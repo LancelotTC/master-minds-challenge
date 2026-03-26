@@ -13,6 +13,8 @@ scikit-optimize
 xgboost
 catboost
 
+prophet
+
 # Deep Learning
 torch
 
