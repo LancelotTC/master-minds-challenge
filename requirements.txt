@@ -7,6 +7,9 @@ python-dotenv
 # Data
 matplotlib
 pandas
+jours_feries_france
+vacances_scolaires_france
+
 
 # Machine Learning
 scikit-optimize
@@ -22,3 +25,4 @@ torch
 
 # Misc
 requests
+bigquery
