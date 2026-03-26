@@ -17,11 +17,12 @@ from xgboost import XGBRegressor
 from movement_model_utils import load_training_and_prediction_frames, make_preprocessor
 
 RANDOM_SEED = 42
-TRAINING_DATASET_SIZE = 5_000
+TRAINING_DATASET_SIZE = 100_000
 TRAINING_DATASET_SUBSAMPLE_SEED = RANDOM_SEED
-SEARCH_ITERATIONS = 10
-CV_FOLDS = 2
-JOBS = 11
+SEARCH_ITERATIONS = 100
+CV_FOLDS = 5
+# -1 for all CPUs. For each job, a copy of the dataset is put in memory. Check number of cores and memory capacity.
+JOBS = -1
 
 
 def prepare_data():
