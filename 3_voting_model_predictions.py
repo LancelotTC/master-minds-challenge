@@ -11,15 +11,18 @@ from movement_model_utils import (
     load_hyperparameter_results,
     load_training_and_prediction_frames,
     make_preprocessor,
+    PREDICTION_MODE_MISSING_TARGET,
+    plot_prediction_results,
     write_predictions,
 )
 
 EXPONENT = 10
+PREDICTION_MODE = PREDICTION_MODE_MISSING_TARGET
 
 
 if __name__ == "__main__":
     training_features, training_target, prediction_features, prediction_ids = (
-        load_training_and_prediction_frames()
+        load_training_and_prediction_frames(prediction_mode=PREDICTION_MODE)
     )
     results = load_hyperparameter_results()
 
@@ -64,4 +67,5 @@ if __name__ == "__main__":
     predictions = ensemble.predict(prediction_features)
     output_path = write_predictions(predictions, prediction_ids, "voting_regressor_preds")
     print(f"Predictions written to {output_path}")
+    plot_prediction_results(output_path)
 

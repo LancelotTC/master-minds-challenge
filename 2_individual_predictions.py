@@ -18,8 +18,13 @@ from movement_model_utils import (
     load_hyperparameter_results,
     load_training_and_prediction_frames,
     make_preprocessor,
+    PREDICTION_MODE_MISSING_TARGET,
+    PREDICTION_MODE_KNOWN_TARGET,
+    plot_prediction_results,
     write_predictions,
 )
+
+PREDICTION_MODE = PREDICTION_MODE_KNOWN_TARGET
 
 
 class ColorString:
@@ -31,6 +36,11 @@ class ColorString:
 
     def __str__(self):
         return self.string
+
+
+def params_without(params: dict[str, object], *excluded_keys: str) -> dict[str, object]:
+    excluded = set(excluded_keys)
+    return {key: value for key, value in params.items() if key not in excluded}
 
 
 def get_predictions(model, features, target, prediction_features):
@@ -60,8 +70,8 @@ def get_predictions(model, features, target, prediction_features):
 
 
 if __name__ == "__main__":
-    training_features, training_target, prediction_features, prediction_ids = (
-        load_training_and_prediction_frames()
+    training_features, training_target, prediction_features, prediction_ids = load_training_and_prediction_frames(
+        prediction_mode=PREDICTION_MODE
     )
     results = load_hyperparameter_results()
 
@@ -69,28 +79,30 @@ if __name__ == "__main__":
         "DecisionTreeRegressor": DecisionTreeRegressor(
             **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
         ),
-        "RandomForestRegressor": RandomForestRegressor(
-            **clean_model_params(results["RandomForestRegressor"]["best_params"])
-        ),
-        "ExtraTreesRegressor": ExtraTreesRegressor(
-            **clean_model_params(results["ExtraTreesRegressor"]["best_params"])
-        ),
-        "CatBoostRegressor": CatBoostRegressor(
-            loss_function="MAE",
-            verbose=False,
-            random_seed=42,
-            allow_writing_files=False,
-            **clean_model_params(results["CatBoostRegressor"]["best_params"]),
-        ),
-        "XGBRegressor": XGBRegressor(
-            **clean_model_params(results["XGBRegressor"]["best_params"])
-        ),
-        "GradientBoostingRegressor": GradientBoostingRegressor(
-            **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
-        ),
-        "HistGradientBoostingRegressor": HistGradientBoostingRegressor(
-            **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
-        ),
+        # "RandomForestRegressor": RandomForestRegressor(
+        #     **clean_model_params(results["RandomForestRegressor"]["best_params"])
+        # ),
+        # "ExtraTreesRegressor": ExtraTreesRegressor(**clean_model_params(results["ExtraTreesRegressor"]["best_params"])),
+        # "CatBoostRegressor": CatBoostRegressor(
+        #     loss_function="MAE",
+        #     verbose=False,
+        #     random_seed=42,
+        #     allow_writing_files=False,
+        #     **params_without(
+        #         clean_model_params(results["CatBoostRegressor"]["best_params"]),
+        #         "loss_function",
+        #         "verbose",
+        #         "random_seed",
+        #         "allow_writing_files",
+        #     ),
+        # ),
+        # "XGBRegressor": XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"])),
+        # "GradientBoostingRegressor": GradientBoostingRegressor(
+        #     **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
+        # ),
+        # "HistGradientBoostingRegressor": HistGradientBoostingRegressor(
+        #     **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
+        # ),
     }
 
     for name, model in regressors.items():
@@ -103,12 +115,9 @@ if __name__ == "__main__":
         output_path = write_predictions(predictions, prediction_ids, f"{name}_preds")
         print(
             ColorString(
-                (
-                    f"{name} validation R2: {validation_r2:.4f} | "
-                    f"validation MAE: {validation_mae:.4f}"
-                ),
+                (f"{name} validation R2: {validation_r2:.4f} | " f"validation MAE: {validation_mae:.4f}"),
                 fg="blue",
             )
         )
         print(f"Predictions written to {output_path}")
-
+        plot_prediction_results(output_path)

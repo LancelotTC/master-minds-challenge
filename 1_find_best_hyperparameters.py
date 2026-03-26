@@ -1,6 +1,5 @@
 import json
 import os
-import random
 
 from catboost import CatBoostRegressor
 from skopt import BayesSearchCV
@@ -18,13 +17,28 @@ from xgboost import XGBRegressor
 from movement_model_utils import load_training_and_prediction_frames, make_preprocessor
 
 RANDOM_SEED = 42
-SEARCH_ITERATIONS = 40
-CV_FOLDS = 3
-JOBS = 10
+TRAINING_DATASET_SIZE = 5_000
+TRAINING_DATASET_SUBSAMPLE_SEED = RANDOM_SEED
+SEARCH_ITERATIONS = 10
+CV_FOLDS = 2
+JOBS = 11
 
 
 def prepare_data():
     features, target, _, _ = load_training_and_prediction_frames()
+
+    if TRAINING_DATASET_SIZE is not None:
+        if TRAINING_DATASET_SIZE <= 0:
+            raise ValueError("TRAINING_DATASET_SIZE must be None or a positive integer.")
+
+        if TRAINING_DATASET_SIZE < len(features):
+            sampled_indices = features.sample(
+                n=TRAINING_DATASET_SIZE,
+                random_state=TRAINING_DATASET_SUBSAMPLE_SEED,
+            ).index
+            features = features.loc[sampled_indices].copy()
+            target = target.loc[sampled_indices].copy()
+
     return features, target
 
 
@@ -47,13 +61,13 @@ def build_models(features):
                 ]
             ),
             {
-                "model__depth": Integer(3, 12),
-                "model__n_estimators": Integer(100, 3000),
-                "model__learning_rate": Real(1e-4, 0.3, prior="log-uniform"),
-                "model__random_strength": Real(0.1, 10.0, prior="log-uniform"),
-                "model__subsample": Real(0.5, 1.0),
-                "model__rsm": Real(0.5, 1.0),
-                "model__min_data_in_leaf": Integer(1, 200),
+                "model__depth": Integer(4, 10),
+                "model__n_estimators": Integer(300, 1600),
+                "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
+                "model__random_strength": Real(0.1, 3.0, prior="log-uniform"),
+                "model__subsample": Real(0.65, 1.0),
+                "model__rsm": Real(0.6, 1.0),
+                "model__min_data_in_leaf": Integer(20, 400),
                 "model__leaf_estimation_method": Categorical(["Gradient"]),
                 "model__loss_function": Categorical(["MAE"]),
             },
@@ -66,14 +80,14 @@ def build_models(features):
                 ]
             ),
             {
-                "model__n_estimators": Integer(100, 3000),
-                "model__learning_rate": Real(1e-4, 0.3, prior="log-uniform"),
-                "model__max_depth": Integer(2, 15),
-                "model__subsample": Real(0.5, 1.0),
-                "model__colsample_bytree": Real(0.5, 1.0),
-                "model__gamma": Real(0.0, 5.0),
-                "model__reg_lambda": Real(0.0, 10.0),
-                "model__min_child_weight": Integer(1, 50),
+                "model__n_estimators": Integer(300, 1800),
+                "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
+                "model__max_depth": Integer(3, 8),
+                "model__subsample": Real(0.65, 1.0),
+                "model__colsample_bytree": Real(0.6, 1.0),
+                "model__gamma": Real(0.0, 2.0),
+                "model__reg_lambda": Real(0.1, 8.0, prior="log-uniform"),
+                "model__min_child_weight": Integer(5, 80),
                 "model__objective": Categorical(["reg:absoluteerror"]),
                 "model__eval_metric": Categorical(["mae"]),
                 "model__tree_method": Categorical(["hist"]),
@@ -87,12 +101,12 @@ def build_models(features):
                 ]
             ),
             {
-                "model__max_depth": Integer(1, 50),
+                "model__max_depth": Integer(4, 18),
                 "model__criterion": Categorical(["absolute_error"]),
-                "model__min_samples_split": Integer(2, 100),
-                "model__min_samples_leaf": Integer(1, 50),
+                "model__min_samples_split": Integer(20, 500),
+                "model__min_samples_leaf": Integer(10, 200),
                 "model__max_features": Categorical([None, "sqrt", "log2"]),
-                "model__ccp_alpha": Real(0.0, 0.1),
+                "model__ccp_alpha": Real(1e-6, 1e-2, prior="log-uniform"),
             },
         ),
         "GradientBoostingRegressor": (
@@ -103,10 +117,10 @@ def build_models(features):
                 ]
             ),
             {
-                "model__n_estimators": Integer(50, 2000),
-                "model__learning_rate": Real(1e-4, 0.3, prior="log-uniform"),
-                "model__max_depth": Integer(2, 10),
-                "model__subsample": Real(0.5, 1.0),
+                "model__n_estimators": Integer(200, 1200),
+                "model__learning_rate": Real(0.01, 0.12, prior="log-uniform"),
+                "model__max_depth": Integer(2, 5),
+                "model__subsample": Real(0.65, 1.0),
                 "model__loss": Categorical(["absolute_error"]),
             },
         ),
@@ -118,10 +132,10 @@ def build_models(features):
                 ]
             ),
             {
-                "model__n_estimators": Integer(100, 3000),
-                "model__max_depth": Integer(2, 50),
-                "model__min_samples_split": Integer(2, 50),
-                "model__min_samples_leaf": Integer(1, 50),
+                "model__n_estimators": Integer(300, 1800),
+                "model__max_depth": Integer(6, 24),
+                "model__min_samples_split": Integer(10, 200),
+                "model__min_samples_leaf": Integer(5, 100),
                 "model__max_features": Categorical(["sqrt", "log2", None]),
                 "model__bootstrap": Categorical([True, False]),
                 "model__criterion": Categorical(["absolute_error"]),
@@ -135,10 +149,10 @@ def build_models(features):
                 ]
             ),
             {
-                "model__n_estimators": Integer(100, 3000),
-                "model__max_depth": Integer(2, 50),
-                "model__min_samples_split": Integer(2, 100),
-                "model__min_samples_leaf": Integer(1, 50),
+                "model__n_estimators": Integer(300, 1800),
+                "model__max_depth": Integer(6, 24),
+                "model__min_samples_split": Integer(10, 300),
+                "model__min_samples_leaf": Integer(5, 100),
                 "model__max_features": Categorical(["sqrt", "log2", None]),
                 "model__bootstrap": Categorical([True, False]),
                 "model__criterion": Categorical(["absolute_error"]),
@@ -155,17 +169,20 @@ def build_models(features):
                 ]
             ),
             {
-                "model__learning_rate": Real(1e-4, 0.3, prior="log-uniform"),
-                "model__max_depth": Integer(2, 50),
-                "model__max_iter": Integer(50, 2000),
-                "model__l2_regularization": Real(0.0, 10.0),
-                "model__min_samples_leaf": Integer(5, 200),
-                "model__max_bins": Integer(32, 255),
+                "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
+                "model__max_depth": Integer(3, 12),
+                "model__max_iter": Integer(200, 1200),
+                "model__l2_regularization": Real(1e-4, 5.0, prior="log-uniform"),
+                "model__min_samples_leaf": Integer(20, 300),
+                "model__max_bins": Integer(64, 255),
                 "model__early_stopping": Categorical([False]),
                 "model__loss": Categorical(["absolute_error"]),
             },
         ),
     }
+
+
+# lstm
 
 
 def test_regressors(features, target, n_rounds=3):
@@ -180,7 +197,7 @@ def test_regressors(features, target, n_rounds=3):
         except json.JSONDecodeError:
             print("Warning: invalid JSON, starting fresh.")
 
-    base_seed = random.randint(0, 10_000)
+    base_seed = RANDOM_SEED
 
     for round_idx in range(1, n_rounds + 1):
         print(f"\n=== ROUND {round_idx}/{n_rounds} ===")
@@ -199,10 +216,7 @@ def test_regressors(features, target, n_rounds=3):
             search.fit(features, target)
 
             best_score = float(search.best_score_)
-            best_params = {
-                key.removeprefix("model__"): value
-                for key, value in search.best_params_.items()
-            }
+            best_params = {key.removeprefix("model__"): value for key, value in search.best_params_.items()}
             previous_score = float(results.get(name, {}).get("best_score", -9999))
 
             if best_score > previous_score:
@@ -224,4 +238,3 @@ if __name__ == "__main__":
     print(f"Training rows: {len(X)}")
     print(f"Feature columns: {len(X.columns)}")
     test_regressors(X, y, n_rounds=1)
-

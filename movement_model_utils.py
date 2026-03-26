@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
-from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 import pandas as pd
@@ -13,61 +10,54 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
 
-DATABASE_PATH = Path("database.db")
-SOURCE_TABLE = "mouvements_aero_insa"
+MAIN_DATASET_PATH = Path("data") / "main_dataset.csv"
 ID_COLUMN = "IdMovement"
-ROW_ID_COLUMN = "sqlite_rowid"
-TARGET_COLUMN = "NbPax"
-PREDICTION_COLUMN = "NbPaxPrediction"
+ROW_ID_COLUMN = "row_number"
+TARGET_COLUMN = "NbPaxTotal"
+PREDICTION_COLUMN = f"{TARGET_COLUMN}Prediction"
 PREDICTION_OUTPUT_DIR = Path("predictions")
 NULL_LIKE_STRINGS = {"", "NULL", "NONE", "NAN", "NAT"}
+PREDICTION_MODE_MISSING_TARGET = "missing_target"
+PREDICTION_MODE_KNOWN_TARGET = "known_target"
 
-# These columns are identifiers or direct passenger-count variants that would
-# leak the target too strongly when predicting NbPax.
-EXCLUDED_FEATURE_COLUMNS = {
-    ID_COLUMN,
-    "IdMovementVinci",
-    "IdFarms",
-    "NbPax",
-    "NbPaxHTransit",
-    "NbPaxTransit",
-    "NbPaxConnecting",
-    "NbPaxTotal",
-    "FarmsNbPax",
-    "FarmsNbPaxConnecting",
-    "FarmsNbPaxHTransit",
-    "FarmsNbPaxTransit",
-    "FarmsNbPaxTotal",
-    "FarmsNbPaxPHMR",
-    "FarmsNbPaxAssisting",
-    "FarmsNbPaxExpected",
-    "InvoiceNbPayingPax",
-    "InvoiceNbPaxConnecting",
-    "InvoiceNbPaxTransit",
-    "InvoiceNbNonPayingPax",
-    "InvoiceNbPaxHTransit",
-    "InvoiceNbPaxTotal",
+FEATURE_COLUMNS = [
+    "IdAircraftType",
+    "IdBusinessUnitType",
+    "IdBusContactType",
+    "airlineOACICode",
+    "AirportPrevious",
+    "ServiceCode",
+    "FlightNumberNormalized",  #
+    "LTScheduledDatetime",
+    "SysTerminal",  #
+    "NbOfSeats",  #
+    "day_of_week",
+    "is_weekend",
+    "season",
+    "dest_country",  #
+    "is_fr_public_holiday",
+    "is_fr_school_holiday_zone_a",
+    "is_dest_public_holiday",
+    "is_dest_school_holiday",
+    "precipitation_sum",  #
+    "rain_sum",  #
+    "snowfall_sum",  #
+    "windspeed_10m_max",  #
+]
+
+CATEGORICAL_FEATURE_COLUMNS = {
+    "IdAircraftType",
+    "airlineOACICode",
+    "AirportPrevious",
+    "ServiceCode",
+    "FlightNumberNormalized",
+    "SysTerminal",
+    "season",
+    "dest_country",
 }
 
-
-@contextmanager
-def open_database(
-    database_path: str | Path = DATABASE_PATH,
-) -> Iterator[tuple[object, object]]:
-    database_path = str(database_path)
-
-    try:
-        from sqlite_manager import SqliteManager
-    except ImportError:
-        connection = sqlite3.connect(database_path)
-        try:
-            yield connection.cursor(), connection
-        finally:
-            connection.close()
-        return
-
-    with SqliteManager(database_path, True) as (db, connection):
-        yield db, connection
+NUMERIC_FEATURE_COLUMNS = set(FEATURE_COLUMNS) - CATEGORICAL_FEATURE_COLUMNS
+REQUIRED_COLUMNS = [ID_COLUMN, TARGET_COLUMN, *FEATURE_COLUMNS]
 
 
 def load_hyperparameter_results(path: str | Path = "hyperparameters.json") -> dict:
@@ -79,53 +69,49 @@ def clean_model_params(params: dict[str, object]) -> dict[str, object]:
     return {str(key).removeprefix("model__"): value for key, value in params.items()}
 
 
-def get_table_schema(
-    table_name: str = SOURCE_TABLE,
-    database_path: str | Path = DATABASE_PATH,
-) -> dict[str, str]:
-    with open_database(database_path) as (_, connection):
-        rows = connection.execute(f"PRAGMA table_info('{table_name}')").fetchall()
-
-    return {str(row[1]): str(row[2]).upper() or "STRING" for row in rows}
-
-
-def load_movements_dataframe(
-    where_clause: str | None = None,
+def load_main_dataset_dataframe(
     limit: int | None = None,
-    include_rowid: bool = False,
-    table_name: str = SOURCE_TABLE,
-    database_path: str | Path = DATABASE_PATH,
+    dataset_path: str | Path = MAIN_DATASET_PATH,
 ) -> pd.DataFrame:
-    select_prefix = f"rowid AS {ROW_ID_COLUMN}, " if include_rowid else ""
-    query = f"SELECT {select_prefix}* FROM {table_name}"
+    dataset_path = Path(dataset_path)
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
 
-    if where_clause:
-        query = f"{query} WHERE {where_clause}"
-    if limit is not None:
-        query = f"{query} LIMIT {int(limit)}"
+    dataframe = pd.read_csv(
+        dataset_path,
+        usecols=lambda column_name: column_name in REQUIRED_COLUMNS,
+        nrows=limit,
+        low_memory=False,
+    )
 
-    with open_database(database_path) as (_, connection):
-        dataframe = pd.read_sql_query(query, connection)
+    missing_columns = [column_name for column_name in REQUIRED_COLUMNS if column_name not in dataframe.columns]
+    if missing_columns:
+        raise RuntimeError(f"Missing required columns in {dataset_path}: {missing_columns}")
 
-    return clean_dataframe(dataframe, get_table_schema(table_name, database_path))
+    if ROW_ID_COLUMN in dataframe.columns:
+        raise RuntimeError(f"Column '{ROW_ID_COLUMN}' is reserved for internal use. Rename it in the dataset.")
+
+    dataframe.insert(0, ROW_ID_COLUMN, np.arange(1, len(dataframe) + 1))
+    return clean_dataframe(dataframe)
 
 
-def clean_dataframe(
-    dataframe: pd.DataFrame,
-    schema: dict[str, str],
-) -> pd.DataFrame:
+def clean_dataframe(dataframe: pd.DataFrame) -> pd.DataFrame:
     cleaned = dataframe.copy()
 
     for column_name in cleaned.columns:
         cleaned[column_name] = replace_null_like_values(cleaned[column_name])
 
-    for column_name, sql_type in schema.items():
-        if column_name not in cleaned.columns:
-            continue
-        cleaned[column_name] = coerce_series_to_schema_type(
-            cleaned[column_name],
-            sql_type,
-        )
+    cleaned[ROW_ID_COLUMN] = pd.to_numeric(cleaned[ROW_ID_COLUMN], errors="coerce")
+    cleaned[ID_COLUMN] = to_object_string_series(cleaned[ID_COLUMN])
+    cleaned[TARGET_COLUMN] = pd.to_numeric(cleaned[TARGET_COLUMN], errors="coerce")
+
+    for column_name in FEATURE_COLUMNS:
+        if column_name in CATEGORICAL_FEATURE_COLUMNS:
+            cleaned[column_name] = to_object_string_series(cleaned[column_name])
+        elif column_name == "LTScheduledDatetime":
+            cleaned[column_name] = pd.to_datetime(cleaned[column_name], errors="coerce")
+        else:
+            cleaned[column_name] = pd.to_numeric(cleaned[column_name], errors="coerce")
 
     object_columns = cleaned.select_dtypes(include=["object"]).columns
     for column_name in object_columns:
@@ -135,9 +121,7 @@ def clean_dataframe(
 
 
 def replace_null_like_values(series: pd.Series) -> pd.Series:
-    if not (
-        pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series)
-    ):
+    if not (pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series)):
         return series
 
     as_string = series.astype("string").str.strip()
@@ -145,76 +129,50 @@ def replace_null_like_values(series: pd.Series) -> pd.Series:
     return series.mask(null_mask, other=np.nan)
 
 
-def coerce_series_to_schema_type(series: pd.Series, sql_type: str) -> pd.Series:
-    if sql_type in {"INTEGER", "FLOAT"}:
-        return pd.to_numeric(series, errors="coerce")
-
-    if sql_type == "BOOLEAN":
-        return pd.to_numeric(
-            series.replace(
-                {
-                    True: 1,
-                    False: 0,
-                    "true": 1,
-                    "false": 0,
-                    "True": 1,
-                    "False": 0,
-                    "oui": 1,
-                    "non": 0,
-                    "Oui": 1,
-                    "Non": 0,
-                }
-            ),
-            errors="coerce",
-        )
-
-    if sql_type in {"DATETIME", "DATE"}:
-        datetimes = pd.to_datetime(series, errors="coerce")
-        datetime_ints = datetimes.astype("int64", copy=False)
-        return pd.Series(
-            np.where(datetimes.notna(), datetime_ints / 1_000_000_000, np.nan),
-            index=series.index,
-        )
-
-    if sql_type == "TIME":
-        timedeltas = pd.to_timedelta(series.astype("string"), errors="coerce")
-        return timedeltas.dt.total_seconds()
-
+def to_object_string_series(series: pd.Series) -> pd.Series:
     string_values = series.astype("string").replace({pd.NA: np.nan})
     return string_values.astype("object")
 
 
-def build_feature_columns(dataframe: pd.DataFrame) -> list[str]:
-    candidate_columns = [
-        column_name
-        for column_name in dataframe.columns
-        if column_name not in EXCLUDED_FEATURE_COLUMNS
-        and column_name != ROW_ID_COLUMN
-    ]
-
-    return [
-        column_name
-        for column_name in candidate_columns
-        if dataframe[column_name].notna().any()
-        and dataframe[column_name].nunique(dropna=True) > 1
-    ]
-
-
 def load_training_and_prediction_frames(
     limit: int | None = None,
+    prediction_mode: str = PREDICTION_MODE_MISSING_TARGET,
 ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.DataFrame]:
-    dataframe = load_movements_dataframe(include_rowid=True, limit=limit)
-    target = pd.to_numeric(dataframe[TARGET_COLUMN], errors="coerce")
-    feature_columns = build_feature_columns(dataframe)
+    if prediction_mode not in {PREDICTION_MODE_MISSING_TARGET, PREDICTION_MODE_KNOWN_TARGET}:
+        raise ValueError(
+            "prediction_mode must be 'missing_target' or 'known_target'."
+        )
 
-    training_mask = target.notna()
-    training_features = dataframe.loc[training_mask, feature_columns].copy()
+    raw_dataframe = load_main_dataset_dataframe(limit=limit)
+    feature_dataframe = build_feature_dataframe(raw_dataframe)
+    target = pd.to_numeric(raw_dataframe[TARGET_COLUMN], errors="coerce")
+    complete_feature_mask = feature_dataframe[FEATURE_COLUMNS].notna().all(axis=1)
+    discarded_feature_mask = ~complete_feature_mask
+
+    print_dataset_debug_summary(raw_dataframe, target, complete_feature_mask)
+    if discarded_feature_mask.any():
+        print_discarded_rows_debug(
+            raw_dataframe,
+            feature_dataframe,
+            discarded_feature_mask,
+        )
+
+    training_mask = target.notna() & complete_feature_mask
+    training_features = feature_dataframe.loc[training_mask, FEATURE_COLUMNS].copy()
     training_target = target.loc[training_mask].astype(float)
-    prediction_identifiers = dataframe.loc[
-        ~training_mask,
-        [ROW_ID_COLUMN, ID_COLUMN],
+
+    prediction_identifier_columns = [ROW_ID_COLUMN, ID_COLUMN]
+    if prediction_mode == PREDICTION_MODE_KNOWN_TARGET:
+        prediction_mask = training_mask
+        prediction_identifier_columns.append(TARGET_COLUMN)
+    else:
+        prediction_mask = target.isna() & complete_feature_mask
+
+    prediction_identifiers = raw_dataframe.loc[prediction_mask, prediction_identifier_columns].copy()
+    prediction_features = feature_dataframe.loc[
+        prediction_mask,
+        FEATURE_COLUMNS,
     ].copy()
-    prediction_features = dataframe.loc[~training_mask, feature_columns].copy()
 
     return (
         training_features,
@@ -224,27 +182,84 @@ def load_training_and_prediction_frames(
     )
 
 
-def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
-    categorical_columns = list(
-        features.select_dtypes(include=["object", "string", "category"]).columns
+def build_feature_dataframe(raw_dataframe: pd.DataFrame) -> pd.DataFrame:
+    features = raw_dataframe[FEATURE_COLUMNS].copy()
+    scheduled = pd.to_datetime(features["LTScheduledDatetime"], errors="coerce")
+    datetime_values = scheduled.astype("int64", copy=False)
+    features["LTScheduledDatetime"] = pd.Series(
+        np.where(scheduled.notna(), datetime_values / 1_000_000_000, np.nan),
+        index=raw_dataframe.index,
     )
-    numeric_columns = [
-        column_name
-        for column_name in features.columns
-        if column_name not in categorical_columns
-    ]
 
-    transformers = []
-    if numeric_columns:
-        transformers.append(
+    for column_name in CATEGORICAL_FEATURE_COLUMNS:
+        features[column_name] = to_object_string_series(features[column_name])
+
+    for column_name in NUMERIC_FEATURE_COLUMNS:
+        features[column_name] = pd.to_numeric(features[column_name], errors="coerce")
+
+    return features
+
+
+def print_dataset_debug_summary(
+    raw_dataframe: pd.DataFrame,
+    target: pd.Series,
+    complete_feature_mask: pd.Series,
+) -> None:
+    return
+    total_rows = len(raw_dataframe)
+    complete_rows = int(complete_feature_mask.sum())
+    incomplete_rows = total_rows - complete_rows
+    target_present_rows = int(target.notna().sum())
+    prediction_candidate_rows = int(target.isna().sum())
+
+    print(
+        "Dataset debug:"
+        f" total_rows={total_rows}"
+        f" complete_feature_rows={complete_rows}"
+        f" discarded_for_missing_features={incomplete_rows}"
+        f" target_present_rows={target_present_rows}"
+        f" target_missing_rows={prediction_candidate_rows}"
+    )
+
+
+def print_discarded_rows_debug(
+    raw_dataframe: pd.DataFrame,
+    feature_dataframe: pd.DataFrame,
+    discarded_feature_mask: pd.Series,
+) -> None:
+    return
+    discarded_features = feature_dataframe.loc[discarded_feature_mask, FEATURE_COLUMNS]
+    discarded_raw_rows = raw_dataframe.loc[discarded_feature_mask]
+
+    print("\nDiscarded rows because at least one kept feature is null:")
+    for row_index in discarded_features.index:
+        missing_columns = discarded_features.columns[discarded_features.loc[row_index].isna()].tolist()
+        row_number = discarded_raw_rows.at[row_index, ROW_ID_COLUMN]
+        movement_id = (
+            discarded_raw_rows.at[row_index, ID_COLUMN]
+            if ID_COLUMN in discarded_raw_rows.columns
+            else "N/A"
+        )
+        target_value = discarded_raw_rows.at[row_index, TARGET_COLUMN]
+        print(
+            f"row_number={row_number} "
+            f"IdMovement={movement_id} "
+            f"{TARGET_COLUMN}={target_value} "
+            f"missing_features={missing_columns}"
+        )
+
+
+def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
+    categorical_columns = list(CATEGORICAL_FEATURE_COLUMNS)
+    numeric_columns = [column_name for column_name in FEATURE_COLUMNS if column_name not in categorical_columns]
+
+    return ColumnTransformer(
+        transformers=[
             (
                 "num",
                 Pipeline([("imputer", SimpleImputer(strategy="median"))]),
                 numeric_columns,
-            )
-        )
-    if categorical_columns:
-        transformers.append(
+            ),
             (
                 "cat",
                 Pipeline(
@@ -260,10 +275,10 @@ def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
                     ]
                 ),
                 categorical_columns,
-            )
-        )
-
-    return ColumnTransformer(transformers=transformers, remainder="drop")
+            ),
+        ],
+        remainder="drop",
+    )
 
 
 def write_predictions(
@@ -275,7 +290,60 @@ def write_predictions(
     clipped_predictions = np.clip(np.rint(np.asarray(predictions)), 0, None).astype(int)
     output[PREDICTION_COLUMN] = clipped_predictions
 
-    PREDICTION_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = PREDICTION_OUTPUT_DIR / f"{filename_stem}.csv"
+    model_folder_name = get_model_folder_name(filename_stem)
+    model_output_dir = PREDICTION_OUTPUT_DIR / model_folder_name
+    model_output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = model_output_dir / f"{filename_stem}.csv"
     output.to_csv(output_path, index=False)
     return output_path
+
+
+def plot_prediction_results(predictions_file: str | Path) -> None:
+    predictions_file = Path(predictions_file)
+    dataframe = pd.read_csv(predictions_file)
+
+    if TARGET_COLUMN not in dataframe.columns or PREDICTION_COLUMN not in dataframe.columns:
+        print(
+            f"Skipping plot for {predictions_file}: "
+            f"requires both {TARGET_COLUMN} and {PREDICTION_COLUMN}."
+        )
+        return
+
+    import matplotlib.pyplot as plt
+
+    actual_values = sorted(pd.to_numeric(dataframe[TARGET_COLUMN], errors="coerce").dropna().tolist())
+    predicted_values = sorted(
+        pd.to_numeric(dataframe[PREDICTION_COLUMN], errors="coerce").dropna().tolist()
+    )
+
+    if not actual_values or not predicted_values:
+        print(f"Skipping plot for {predictions_file}: no plottable values found.")
+        return
+
+    if len(actual_values) != len(predicted_values):
+        common_length = min(len(actual_values), len(predicted_values))
+        actual_values = actual_values[:common_length]
+        predicted_values = predicted_values[:common_length]
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(actual_values, predicted_values, color="blue")
+    plt.plot(actual_values, actual_values, color="green")
+    plt.plot(actual_values, [value * 1.05 for value in actual_values], linestyle="--", color="orange")
+    plt.plot([value * 1.05 for value in actual_values], actual_values, linestyle="--", color="orange")
+    plt.plot(actual_values, [value * 1.1 for value in actual_values], linestyle="--", color="red")
+    plt.plot([value * 1.1 for value in actual_values], actual_values, linestyle="--", color="red")
+    plt.title(predictions_file.stem)
+    plt.xlabel(TARGET_COLUMN)
+    plt.ylabel(PREDICTION_COLUMN)
+    plt.tight_layout()
+    plot_path = predictions_file.with_suffix(".png")
+    plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+    print(f"Plot written to {plot_path}")
+    plt.show()
+    plt.close()
+
+
+def get_model_folder_name(filename_stem: str) -> str:
+    if filename_stem.endswith("_preds"):
+        return filename_stem.removesuffix("_preds")
+    return filename_stem
