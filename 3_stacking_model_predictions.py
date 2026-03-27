@@ -6,6 +6,7 @@ from sklearn.ensemble import (
 )
 from sklearn.linear_model import RidgeCV
 from sklearn.pipeline import Pipeline
+from tqdm.auto import tqdm
 
 from movement_model_utils import (
     clean_model_params,
@@ -14,6 +15,7 @@ from movement_model_utils import (
     make_preprocessor,
     PREDICTION_MODE_MISSING_TARGET,
     plot_prediction_results,
+    run_progress_step,
     write_predictions,
 )
 
@@ -21,42 +23,53 @@ PREDICTION_MODE = PREDICTION_MODE_MISSING_TARGET
 
 
 if __name__ == "__main__":
-    training_features, training_target, prediction_features, prediction_ids = (
-        load_training_and_prediction_frames(prediction_mode=PREDICTION_MODE)
-    )
-    results = load_hyperparameter_results()
+    with tqdm(total=8, desc="Stacking workflow", unit="step") as progress:
+        training_features, training_target, prediction_features, prediction_ids = run_progress_step(
+            progress,
+            "load_data",
+            load_training_and_prediction_frames,
+            prediction_mode=PREDICTION_MODE,
+        )
+        results = run_progress_step(progress, "load_hparams", load_hyperparameter_results)
 
-    def params_for(model_name):
-        return clean_model_params(results[model_name]["best_params"])
+        def params_for(model_name):
+            return clean_model_params(results[model_name]["best_params"])
 
-    base_models = [
-        ("rf", RandomForestRegressor(**params_for("RandomForestRegressor"))),
-        ("et", ExtraTreesRegressor(**params_for("ExtraTreesRegressor"))),
-        ("gbr", GradientBoostingRegressor(**params_for("GradientBoostingRegressor"))),
-    ]
+        def build_base_models():
+            return [
+                ("rf", RandomForestRegressor(**params_for("RandomForestRegressor"))),
+                ("et", ExtraTreesRegressor(**params_for("ExtraTreesRegressor"))),
+                ("gbr", GradientBoostingRegressor(**params_for("GradientBoostingRegressor"))),
+            ]
 
-    meta_model = RidgeCV(alphas=[0.1, 1.0, 10.0])
-    stacked_model = Pipeline(
-        [
-            ("preprocess", make_preprocessor(training_features)),
-            (
-                "stack",
-                StackingRegressor(
-                    estimators=base_models,
-                    final_estimator=meta_model,
-                    n_jobs=10,
-                ),
-            ),
-        ]
-    )
+        base_models = run_progress_step(progress, "build_models", build_base_models)
+        meta_model = RidgeCV(alphas=[0.1, 1.0, 10.0])
 
-    stacked_model.fit(training_features, training_target)
-    predictions = stacked_model.predict(prediction_features)
-    output_path = write_predictions(
-        predictions,
-        prediction_ids,
-        "stacking_regressor_preds",
-    )
-    print(f"Predictions written to {output_path}")
-    plot_prediction_results(output_path)
+        def build_stacked_model():
+            return Pipeline(
+                [
+                    ("preprocess", make_preprocessor(training_features)),
+                    (
+                        "stack",
+                        StackingRegressor(
+                            estimators=base_models,
+                            final_estimator=meta_model,
+                            n_jobs=10,
+                        ),
+                    ),
+                ]
+            )
 
+        stacked_model = run_progress_step(progress, "build_pipeline", build_stacked_model)
+        run_progress_step(progress, "fit", stacked_model.fit, training_features, training_target)
+        predictions = run_progress_step(progress, "predict", stacked_model.predict, prediction_features)
+        output_path = run_progress_step(
+            progress,
+            "write_csv",
+            write_predictions,
+            predictions,
+            prediction_ids,
+            "stacking_regressor_preds",
+        )
+        print(f"Predictions written to {output_path}")
+        run_progress_step(progress, "plot", plot_prediction_results, output_path)

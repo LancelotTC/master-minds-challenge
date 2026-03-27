@@ -16,6 +16,7 @@ from sklearn.ensemble import (
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
+from tqdm.auto import tqdm
 
 from movement_model_utils import load_training_and_prediction_frames, make_preprocessor
 
@@ -25,7 +26,7 @@ TRAINING_DATASET_SUBSAMPLE_SEED = RANDOM_SEED
 SEARCH_ITERATIONS = 100
 CV_FOLDS = 5
 # -1 for all CPUs. For each job, a copy of the dataset is put in memory. Check number of cores and memory capacity.
-JOBS = -1
+JOBS = os.cpu_count() - 1
 RESULTS_FILENAME = "hyperparameters.json"
 RESULTS_PATH = Path(__file__).resolve().parent / RESULTS_FILENAME
 
@@ -96,118 +97,118 @@ def build_models(features):
     search_profile = build_search_profile(len(features))
 
     return {
-        "CatBoostRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    (
-                        "model",
-                        CatBoostRegressor(
-                            verbose=False,
-                            random_seed=RANDOM_SEED,
-                            allow_writing_files=False,
-                        ),
-                    ),
-                ]
-            ),
-            {
-                "model__depth": integer_range(4, search_profile["catboost_depth_upper"]),
-                "model__n_estimators": integer_range(200, search_profile["boosting_estimators_upper"]),
-                "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
-                "model__random_strength": Real(0.1, 3.0, prior="log-uniform"),
-                "model__subsample": Real(0.65, 1.0),
-                "model__rsm": Real(0.6, 1.0),
-                "model__min_data_in_leaf": integer_range(20, search_profile["catboost_min_data_in_leaf_upper"]),
-                "model__leaf_estimation_method": Categorical(["Gradient"]),
-                "model__loss_function": Categorical(["MAE"]),
-            },
-        ),
-        "XGBRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    ("model", XGBRegressor(random_state=RANDOM_SEED)),
-                ]
-            ),
-            {
-                "model__n_estimators": integer_range(200, search_profile["boosting_estimators_upper"]),
-                "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
-                "model__max_depth": integer_range(3, search_profile["boosting_depth_upper"]),
-                "model__subsample": Real(0.65, 1.0),
-                "model__colsample_bytree": Real(0.6, 1.0),
-                "model__gamma": Real(0.0, 2.0),
-                "model__reg_lambda": Real(0.1, 8.0, prior="log-uniform"),
-                "model__min_child_weight": integer_range(1, search_profile["xgb_min_child_weight_upper"]),
-                "model__objective": Categorical(["reg:absoluteerror"]),
-                "model__eval_metric": Categorical(["mae"]),
-                "model__tree_method": Categorical(["hist"]),
-            },
-        ),
-        "DecisionTreeRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    ("model", DecisionTreeRegressor(random_state=RANDOM_SEED)),
-                ]
-            ),
-            {
-                "model__max_depth": integer_range(4, search_profile["tree_depth_upper"]),
-                "model__criterion": Categorical(["absolute_error"]),
-                "model__min_samples_split": integer_range(2, search_profile["tree_min_samples_split_upper"]),
-                "model__min_samples_leaf": integer_range(1, search_profile["tree_min_samples_leaf_upper"]),
-                "model__max_features": Categorical([None, "sqrt", "log2"]),
-                "model__ccp_alpha": Real(1e-6, 1e-2, prior="log-uniform"),
-            },
-        ),
-        "GradientBoostingRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    ("model", GradientBoostingRegressor(random_state=RANDOM_SEED)),
-                ]
-            ),
-            {
-                "model__n_estimators": integer_range(150, search_profile["boosting_estimators_upper"]),
-                "model__learning_rate": Real(0.01, 0.12, prior="log-uniform"),
-                "model__max_depth": integer_range(2, search_profile["boosting_depth_upper"]),
-                "model__subsample": Real(0.65, 1.0),
-                "model__loss": Categorical(["absolute_error"]),
-            },
-        ),
-        "RandomForestRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    ("model", RandomForestRegressor(random_state=RANDOM_SEED)),
-                ]
-            ),
-            {
-                "model__n_estimators": integer_range(200, search_profile["forest_estimators_upper"]),
-                "model__max_depth": integer_range(6, search_profile["tree_depth_upper"]),
-                "model__min_samples_split": integer_range(2, search_profile["forest_min_samples_split_upper"]),
-                "model__min_samples_leaf": integer_range(1, search_profile["forest_min_samples_leaf_upper"]),
-                "model__max_features": Categorical(["sqrt", "log2", None]),
-                "model__bootstrap": Categorical([True, False]),
-                "model__criterion": Categorical(["absolute_error"]),
-            },
-        ),
-        "ExtraTreesRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    ("model", ExtraTreesRegressor(random_state=RANDOM_SEED)),
-                ]
-            ),
-            {
-                "model__n_estimators": integer_range(200, search_profile["forest_estimators_upper"]),
-                "model__max_depth": integer_range(6, search_profile["tree_depth_upper"]),
-                "model__min_samples_split": integer_range(2, search_profile["forest_min_samples_split_upper"]),
-                "model__min_samples_leaf": integer_range(1, search_profile["forest_min_samples_leaf_upper"]),
-                "model__max_features": Categorical(["sqrt", "log2", None]),
-                "model__bootstrap": Categorical([True, False]),
-                "model__criterion": Categorical(["absolute_error"]),
-            },
-        ),
+        # "CatBoostRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             (
+        #                 "model",
+        #                 CatBoostRegressor(
+        #                     verbose=False,
+        #                     random_seed=RANDOM_SEED,
+        #                     allow_writing_files=False,
+        #                 ),
+        #             ),
+        #         ]
+        #     ),
+        #     {
+        #         "model__depth": integer_range(4, search_profile["catboost_depth_upper"]),
+        #         "model__n_estimators": integer_range(200, search_profile["boosting_estimators_upper"]),
+        #         "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
+        #         "model__random_strength": Real(0.1, 3.0, prior="log-uniform"),
+        #         "model__subsample": Real(0.65, 1.0),
+        #         "model__rsm": Real(0.6, 1.0),
+        #         "model__min_data_in_leaf": integer_range(20, search_profile["catboost_min_data_in_leaf_upper"]),
+        #         "model__leaf_estimation_method": Categorical(["Gradient"]),
+        #         "model__loss_function": Categorical(["MAE"]),
+        #     },
+        # ),
+        # "XGBRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             ("model", XGBRegressor(random_state=RANDOM_SEED)),
+        #         ]
+        #     ),
+        #     {
+        #         "model__n_estimators": integer_range(200, search_profile["boosting_estimators_upper"]),
+        #         "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
+        #         "model__max_depth": integer_range(3, search_profile["boosting_depth_upper"]),
+        #         "model__subsample": Real(0.65, 1.0),
+        #         "model__colsample_bytree": Real(0.6, 1.0),
+        #         "model__gamma": Real(0.0, 2.0),
+        #         "model__reg_lambda": Real(0.1, 8.0, prior="log-uniform"),
+        #         "model__min_child_weight": integer_range(1, search_profile["xgb_min_child_weight_upper"]),
+        #         "model__objective": Categorical(["reg:absoluteerror"]),
+        #         "model__eval_metric": Categorical(["mae"]),
+        #         "model__tree_method": Categorical(["hist"]),
+        #     },
+        # ),
+        # "DecisionTreeRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             ("model", DecisionTreeRegressor(random_state=RANDOM_SEED)),
+        #         ]
+        #     ),
+        #     {
+        #         "model__max_depth": integer_range(4, search_profile["tree_depth_upper"]),
+        #         "model__criterion": Categorical(["absolute_error"]),
+        #         "model__min_samples_split": integer_range(2, search_profile["tree_min_samples_split_upper"]),
+        #         "model__min_samples_leaf": integer_range(1, search_profile["tree_min_samples_leaf_upper"]),
+        #         "model__max_features": Categorical([None, "sqrt", "log2"]),
+        #         "model__ccp_alpha": Real(1e-6, 1e-2, prior="log-uniform"),
+        #     },
+        # ),
+        # "GradientBoostingRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             ("model", GradientBoostingRegressor(random_state=RANDOM_SEED)),
+        #         ]
+        #     ),
+        #     {
+        #         "model__n_estimators": integer_range(150, search_profile["boosting_estimators_upper"]),
+        #         "model__learning_rate": Real(0.01, 0.12, prior="log-uniform"),
+        #         "model__max_depth": integer_range(2, search_profile["boosting_depth_upper"]),
+        #         "model__subsample": Real(0.65, 1.0),
+        #         "model__loss": Categorical(["absolute_error"]),
+        #     },
+        # ),
+        # "RandomForestRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             ("model", RandomForestRegressor(random_state=RANDOM_SEED)),
+        #         ]
+        #     ),
+        #     {
+        #         "model__n_estimators": integer_range(200, search_profile["forest_estimators_upper"]),
+        #         "model__max_depth": integer_range(6, search_profile["tree_depth_upper"]),
+        #         "model__min_samples_split": integer_range(2, search_profile["forest_min_samples_split_upper"]),
+        #         "model__min_samples_leaf": integer_range(1, search_profile["forest_min_samples_leaf_upper"]),
+        #         "model__max_features": Categorical(["sqrt", "log2", None]),
+        #         "model__bootstrap": Categorical([True, False]),
+        #         "model__criterion": Categorical(["absolute_error"]),
+        #     },
+        # ),
+        # "ExtraTreesRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             ("model", ExtraTreesRegressor(random_state=RANDOM_SEED)),
+        #         ]
+        #     ),
+        #     {
+        #         "model__n_estimators": integer_range(200, search_profile["forest_estimators_upper"]),
+        #         "model__max_depth": integer_range(6, search_profile["tree_depth_upper"]),
+        #         "model__min_samples_split": integer_range(2, search_profile["forest_min_samples_split_upper"]),
+        #         "model__min_samples_leaf": integer_range(1, search_profile["forest_min_samples_leaf_upper"]),
+        #         "model__max_features": Categorical(["sqrt", "log2", None]),
+        #         "model__bootstrap": Categorical([True, False]),
+        #         "model__criterion": Categorical(["absolute_error"]),
+        #     },
+        # ),
         "HistGradientBoostingRegressor": (
             Pipeline(
                 [
@@ -275,6 +276,15 @@ def write_results_file(results_path: Path, results: dict[str, object]) -> None:
             temp_path.unlink(missing_ok=True)
 
 
+def _make_search_progress_callback(progress_bar):
+    def _callback(_result):
+        if progress_bar.n < progress_bar.total:
+            progress_bar.update(1)
+        return False
+
+    return _callback
+
+
 def test_regressors(features, target, n_rounds=3):
     models = build_models(features)
     results_path = RESULTS_PATH
@@ -290,10 +300,16 @@ def test_regressors(features, target, n_rounds=3):
 
     base_seed = RANDOM_SEED
 
-    for round_idx in range(1, n_rounds + 1):
+    model_items = list(models.items())
+
+    for round_idx in tqdm(range(1, n_rounds + 1), desc="Hyperparameter rounds", unit="round"):
         print(f"\n=== ROUND {round_idx}/{n_rounds} ===")
-        for name, (model, params) in models.items():
-            print(f"Testing {name}...")
+        for name, (model, params) in tqdm(
+            model_items,
+            desc=f"Round {round_idx}/{n_rounds}",
+            unit="model",
+            leave=False,
+        ):
             search = BayesSearchCV(
                 model,
                 params,
@@ -302,9 +318,13 @@ def test_regressors(features, target, n_rounds=3):
                 scoring="neg_mean_absolute_error",
                 n_jobs=JOBS,
                 random_state=base_seed + round_idx,
-                verbose=1,
+                verbose=0,
             )
-            search.fit(features, target)
+
+            with tqdm(total=SEARCH_ITERATIONS, desc=f"{name} search", unit="iter", leave=False) as search_bar:
+                search.fit(features, target, callback=_make_search_progress_callback(search_bar))
+                if search_bar.n < search_bar.total:
+                    search_bar.update(search_bar.total - search_bar.n)
 
             best_score = float(search.best_score_)
             best_params = {key.removeprefix("model__"): value for key, value in search.best_params_.items()}
