@@ -16,6 +16,9 @@ ROW_ID_COLUMN = "row_number"
 TARGET_COLUMN = "NbPaxTotal"
 PREDICTION_COLUMN = f"{TARGET_COLUMN}Prediction"
 PREDICTION_OUTPUT_DIR = Path("predictions")
+PROJECT_ROOT = Path(__file__).resolve().parent
+HYPERPARAMETERS_RESULTS_PATH = PROJECT_ROOT / "hyperparameters.json"
+MAX_PLOT_POINTS = 80_000
 NULL_LIKE_STRINGS = {"", "NULL", "NONE", "NAN", "NAT"}
 PREDICTION_MODE_MISSING_TARGET = "missing_target"
 PREDICTION_MODE_KNOWN_TARGET = "known_target"
@@ -81,7 +84,7 @@ NUMERIC_FEATURE_COLUMNS = set(FEATURE_COLUMNS) - CATEGORICAL_FEATURE_COLUMNS
 REQUIRED_COLUMNS = [ID_COLUMN, TARGET_COLUMN, *FEATURE_COLUMNS]
 
 
-def load_hyperparameter_results(path: str | Path = "hyperparameters.json") -> dict:
+def load_hyperparameter_results(path: str | Path = HYPERPARAMETERS_RESULTS_PATH) -> dict:
     with open(path, "r", encoding="utf-8") as file:
         return json.load(file)
 
@@ -324,7 +327,21 @@ def write_predictions(
     return output_path
 
 
-def plot_prediction_results(predictions_file: str | Path) -> None:
+def _prepare_prediction_plot_data(dataframe: pd.DataFrame) -> pd.DataFrame:
+    paired = pd.DataFrame(
+        {
+            TARGET_COLUMN: pd.to_numeric(dataframe[TARGET_COLUMN], errors="coerce"),
+            PREDICTION_COLUMN: pd.to_numeric(dataframe[PREDICTION_COLUMN], errors="coerce"),
+        }
+    ).dropna()
+    return paired
+
+
+def plot_prediction_results(
+    predictions_file: str | Path,
+    show: bool = False,
+    max_points: int = MAX_PLOT_POINTS,
+) -> Path | None:
     predictions_file = Path(predictions_file)
     dataframe = pd.read_csv(predictions_file)
 
@@ -333,40 +350,105 @@ def plot_prediction_results(predictions_file: str | Path) -> None:
             f"Skipping plot for {predictions_file}: "
             f"requires both {TARGET_COLUMN} and {PREDICTION_COLUMN}."
         )
-        return
+        return None
+
+    plot_data = _prepare_prediction_plot_data(dataframe)
+    if plot_data.empty:
+        print(f"Skipping plot for {predictions_file}: no plottable values found.")
+        return None
+
+    if max_points > 0 and len(plot_data) > max_points:
+        plot_data = plot_data.sample(n=max_points, random_state=42)
 
     import matplotlib.pyplot as plt
 
-    actual_values = sorted(pd.to_numeric(dataframe[TARGET_COLUMN], errors="coerce").dropna().tolist())
-    predicted_values = sorted(
-        pd.to_numeric(dataframe[PREDICTION_COLUMN], errors="coerce").dropna().tolist()
+    actual_values = plot_data[TARGET_COLUMN].to_numpy(dtype=float)
+    predicted_values = plot_data[PREDICTION_COLUMN].to_numpy(dtype=float)
+    residual_values = predicted_values - actual_values
+
+    axis_min = min(0.0, float(np.nanmin([actual_values.min(), predicted_values.min()])))
+    axis_max = float(np.nanmax([actual_values.max(), predicted_values.max()]))
+    if not np.isfinite(axis_min) or not np.isfinite(axis_max):
+        print(f"Skipping plot for {predictions_file}: no finite values found.")
+        return None
+    if axis_max <= axis_min:
+        axis_max = axis_min + 1.0
+
+    line_x = np.linspace(axis_min, axis_max, 300)
+
+    figure, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    density_main = axes[0].hexbin(
+        actual_values,
+        predicted_values,
+        gridsize=65,
+        mincnt=1,
+        bins="log",
+        cmap="viridis",
     )
+    axes[0].plot(line_x, line_x, color="white", linewidth=1.5, label="Ideal")
+    axes[0].plot(line_x, line_x * 1.1, color="orange", linestyle="--", linewidth=1.2, label="+/-10%")
+    axes[0].plot(line_x, line_x * 0.9, color="orange", linestyle="--", linewidth=1.2)
+    axes[0].fill_between(line_x, line_x * 0.9, line_x * 1.1, color="orange", alpha=0.08)
+    axes[0].set_xlim(axis_min, axis_max)
+    axes[0].set_ylim(axis_min, axis_max)
+    axes[0].set_xlabel(TARGET_COLUMN)
+    axes[0].set_ylabel(PREDICTION_COLUMN)
+    axes[0].set_title("Predicted vs actual")
+    axes[0].legend(loc="upper left")
+    figure.colorbar(density_main, ax=axes[0], label="log10(count)")
 
-    if not actual_values or not predicted_values:
-        print(f"Skipping plot for {predictions_file}: no plottable values found.")
-        return
+    density_residual = axes[1].hexbin(
+        actual_values,
+        residual_values,
+        gridsize=65,
+        mincnt=1,
+        bins="log",
+        cmap="magma",
+    )
+    axes[1].axhline(0.0, color="white", linewidth=1.5)
+    axes[1].set_xlabel(TARGET_COLUMN)
+    axes[1].set_ylabel(f"{PREDICTION_COLUMN} - {TARGET_COLUMN}")
+    axes[1].set_title("Residuals")
+    figure.colorbar(density_residual, ax=axes[1], label="log10(count)")
 
-    if len(actual_values) != len(predicted_values):
-        common_length = min(len(actual_values), len(predicted_values))
-        actual_values = actual_values[:common_length]
-        predicted_values = predicted_values[:common_length]
+    figure.suptitle(f"{predictions_file.stem} (n={len(plot_data):,})")
+    figure.tight_layout(rect=(0, 0, 1, 0.96))
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(actual_values, predicted_values, color="blue")
-    plt.plot(actual_values, actual_values, color="green")
-    plt.plot(actual_values, [value * 1.05 for value in actual_values], linestyle="--", color="orange")
-    plt.plot([value * 1.05 for value in actual_values], actual_values, linestyle="--", color="orange")
-    plt.plot(actual_values, [value * 1.1 for value in actual_values], linestyle="--", color="red")
-    plt.plot([value * 1.1 for value in actual_values], actual_values, linestyle="--", color="red")
-    plt.title(predictions_file.stem)
-    plt.xlabel(TARGET_COLUMN)
-    plt.ylabel(PREDICTION_COLUMN)
-    plt.tight_layout()
     plot_path = predictions_file.with_suffix(".png")
-    plt.savefig(plot_path, dpi=150, bbox_inches="tight")
+    figure.savefig(plot_path, dpi=160, bbox_inches="tight")
     print(f"Plot written to {plot_path}")
-    plt.show()
-    plt.close()
+
+    if show:
+        plt.show()
+
+    plt.close(figure)
+    return plot_path
+
+
+def regenerate_prediction_plots(
+    predictions_root: str | Path = PREDICTION_OUTPUT_DIR,
+    pattern: str = "*_preds.csv",
+    show: bool = False,
+    max_points: int = MAX_PLOT_POINTS,
+) -> list[Path]:
+    predictions_root = Path(predictions_root)
+    if not predictions_root.exists():
+        raise FileNotFoundError(f"Predictions directory not found: {predictions_root}")
+
+    prediction_files = sorted(predictions_root.rglob(pattern))
+    if not prediction_files:
+        print(f"No prediction CSV files found in {predictions_root} with pattern '{pattern}'.")
+        return []
+
+    generated_plots: list[Path] = []
+    for prediction_file in prediction_files:
+        plot_path = plot_prediction_results(prediction_file, show=show, max_points=max_points)
+        if plot_path is not None:
+            generated_plots.append(plot_path)
+
+    print(f"Regenerated {len(generated_plots)} plot(s) from {len(prediction_files)} prediction file(s).")
+    return generated_plots
 
 
 def get_model_folder_name(filename_stem: str) -> str:

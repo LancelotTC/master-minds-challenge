@@ -1,6 +1,7 @@
 import json
 import math
 import os
+from pathlib import Path
 
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
@@ -25,6 +26,8 @@ SEARCH_ITERATIONS = 100
 CV_FOLDS = 5
 # -1 for all CPUs. For each job, a copy of the dataset is put in memory. Check number of cores and memory capacity.
 JOBS = -1
+RESULTS_FILENAME = "hyperparameters.json"
+RESULTS_PATH = Path(__file__).resolve().parent / RESULTS_FILENAME
 
 
 def clamp_int(value: float, minimum: int, maximum: int) -> int:
@@ -259,13 +262,26 @@ def build_models(features):
 # lstm
 
 
+def write_results_file(results_path: Path, results: dict[str, object]) -> None:
+    results_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = results_path.with_suffix(f"{results_path.suffix}.tmp")
+
+    try:
+        with open(temp_path, "w", encoding="utf-8") as file:
+            json.dump(results, file, indent=4)
+        os.replace(temp_path, results_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+
+
 def test_regressors(features, target, n_rounds=3):
     models = build_models(features)
-    results_path = "hyperparameters.json"
+    results_path = RESULTS_PATH
     results = {}
     effective_training_rows = len(features)
 
-    if os.path.exists(results_path):
+    if results_path.exists():
         try:
             with open(results_path, "r", encoding="utf-8") as file:
                 results = json.load(file)
@@ -304,8 +320,13 @@ def test_regressors(features, target, n_rounds=3):
                     "best_params": best_params,
                     "training_rows": effective_training_rows,
                 }
-                with open(results_path, "w", encoding="utf-8") as file:
-                    json.dump(results, file, indent=4)
+                try:
+                    write_results_file(results_path, results)
+                except OSError as error:
+                    raise OSError(
+                        f"Failed to write hyperparameter results to {results_path}. "
+                        f"Current working directory: {Path.cwd()}"
+                    ) from error
             else:
                 print(f"No improvement ({best_score:.4f} <= {previous_score:.4f})")
 
