@@ -13,6 +13,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
+from tqdm.auto import tqdm
 
 from movement_model_utils import (
     clean_model_params,
@@ -22,6 +23,7 @@ from movement_model_utils import (
     PREDICTION_MODE_MISSING_TARGET,
     PREDICTION_MODE_KNOWN_TARGET,
     plot_prediction_results,
+    run_progress_step,
     write_predictions,
 )
 
@@ -44,7 +46,7 @@ def params_without(params: dict[str, object], *excluded_keys: str) -> dict[str, 
     return {key: value for key, value in params.items() if key not in excluded}
 
 
-def get_predictions(model, features, target, prediction_features):
+def get_predictions(model, features, target, prediction_features, step_progress=None):
     pipeline = Pipeline(
         [
             ("preprocess", make_preprocessor(features)),
@@ -59,9 +61,9 @@ def get_predictions(model, features, target, prediction_features):
         random_state=42,
     )
 
-    pipeline.fit(X_train, y_train)
-    validation_predictions = pipeline.predict(X_val)
-    prediction_rows = pipeline.predict(prediction_features)
+    run_progress_step(step_progress, "fit", pipeline.fit, X_train, y_train)
+    validation_predictions = run_progress_step(step_progress, "val_predict", pipeline.predict, X_val)
+    prediction_rows = run_progress_step(step_progress, "predict", pipeline.predict, prediction_features)
 
     return (
         prediction_rows,
@@ -128,14 +130,26 @@ if __name__ == "__main__":
     if not regressors:
         raise RuntimeError("No enabled regressors found in hyperparameters.json.")
 
-    for name, model in regressors.items():
-        predictions, validation_r2, validation_mae = get_predictions(
-            model,
-            training_features,
-            training_target,
-            prediction_features,
-        )
-        output_path = write_predictions(predictions, prediction_ids, f"{name}_preds")
+    for name, model in tqdm(regressors.items(), total=len(regressors), desc="Regressors", unit="model"):
+        with tqdm(total=5, desc=f"{name}", unit="step", leave=False) as step_progress:
+            predictions, validation_r2, validation_mae = get_predictions(
+                model,
+                training_features,
+                training_target,
+                prediction_features,
+                step_progress=step_progress,
+            )
+
+            output_path = run_progress_step(
+                step_progress,
+                "write_csv",
+                write_predictions,
+                predictions,
+                prediction_ids,
+                f"{name}_preds",
+            )
+            run_progress_step(step_progress, "plot", plot_prediction_results, output_path)
+
         print(
             ColorString(
                 (f"{name} validation R2: {validation_r2:.4f} | " f"validation MAE: {validation_mae:.4f}"),
@@ -143,4 +157,3 @@ if __name__ == "__main__":
             )
         )
         print(f"Predictions written to {output_path}")
-        plot_prediction_results(output_path)

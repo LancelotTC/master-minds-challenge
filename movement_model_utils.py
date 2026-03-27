@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Callable, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
+from tqdm.auto import tqdm
 
 MAIN_DATASET_PATH = Path("data") / "main_dataset.csv"
 ID_COLUMN = "IdMovement"
@@ -82,6 +84,7 @@ CATEGORICAL_FEATURE_COLUMNS = {
 
 NUMERIC_FEATURE_COLUMNS = set(FEATURE_COLUMNS) - CATEGORICAL_FEATURE_COLUMNS
 REQUIRED_COLUMNS = [ID_COLUMN, TARGET_COLUMN, *FEATURE_COLUMNS]
+ProgressResult = TypeVar("ProgressResult")
 
 
 def load_hyperparameter_results(path: str | Path = HYPERPARAMETERS_RESULTS_PATH) -> dict:
@@ -91,6 +94,25 @@ def load_hyperparameter_results(path: str | Path = HYPERPARAMETERS_RESULTS_PATH)
 
 def clean_model_params(params: dict[str, object]) -> dict[str, object]:
     return {str(key).removeprefix("model__"): value for key, value in params.items()}
+
+
+def run_progress_step(
+    progress_bar,
+    label: str,
+    action: Callable[..., ProgressResult],
+    /,
+    *args,
+    **kwargs,
+) -> ProgressResult:
+    if progress_bar is not None:
+        progress_bar.set_postfix_str(label)
+
+    result = action(*args, **kwargs)
+
+    if progress_bar is not None:
+        progress_bar.update(1)
+
+    return result
 
 
 def load_main_dataset_dataframe(
@@ -442,7 +464,7 @@ def regenerate_prediction_plots(
         return []
 
     generated_plots: list[Path] = []
-    for prediction_file in prediction_files:
+    for prediction_file in tqdm(prediction_files, desc="Regenerating plots", unit="file"):
         plot_path = plot_prediction_results(prediction_file, show=show, max_points=max_points)
         if plot_path is not None:
             generated_plots.append(plot_path)
