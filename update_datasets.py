@@ -1,37 +1,17 @@
 import os
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Iterator
 
 import numpy as np
 import pandas as pd
 import requests
 from dotenv import load_dotenv
-
-try:
-    from google.cloud import bigquery
-    from google.cloud.bigquery.table import Row
-except ImportError:
-    bigquery = None
-    Row = Any
-
-try:
-    from utils import ProgressBar
-except ImportError:
-
-    class ProgressBar:
-        def __init__(self, total: int, update_every: int = 1):
-            self.total = total
-            self.update_every = update_every
-
-        def start(self) -> None:
-            return
-
-        def increment(self) -> None:
-            return
-
-        def finish(self) -> None:
-            return
+from google.cloud import bigquery
+from google.cloud.bigquery.table import Row
+from jours_feries_france import JoursFeries
+from utils import ProgressBar
+from vacances_scolaires_france import SchoolHolidayDates
 
 
 DATA_FOLDER = Path("data")
@@ -251,9 +231,6 @@ def load_main_dataset() -> None:
         print(f"\tMain dataset already exists at {MAIN_DATASET_FILE}. Skipping download.")
         return
 
-    if bigquery is None:
-        raise ImportError("google-cloud-bigquery is required to download the main dataset.")
-
     project_id = _get_required_env("PROJECT_ID")
     dataset_id = _get_required_env("DATASET_ID")
     table_id = _get_required_env("TABLE_ID")
@@ -326,9 +303,6 @@ def load_weather_data() -> None:
 
 
 def load_holiday_data() -> None:
-    from jours_feries_france import JoursFeries
-    from vacances_scolaires_france import SchoolHolidayDates
-
     if not MAIN_DATASET_FILE.exists():
         raise FileNotFoundError(f"Main dataset not found at {MAIN_DATASET_FILE}")
 
