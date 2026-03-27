@@ -1,7 +1,11 @@
-import requests
-import os, pandas as pd
+import os
+from datetime import timedelta
 from pathlib import Path
-from utils import ProgressBar
+from typing import Any, Iterator
+
+import numpy as np
+import pandas as pd
+import requests
 from dotenv import load_dotenv
 
 try:
@@ -30,6 +34,13 @@ except ImportError:
             return
 
 
+DATA_FOLDER = Path("data")
+WEATHER_FOLDER = DATA_FOLDER / "weather"
+HOLIDAYS_FOLDER = DATA_FOLDER / "holidays"
+ORIGINAL_DATASET_FILE = DATA_FOLDER / "original_dataset.csv"
+MAIN_DATASET_FILE = DATA_FOLDER / "main_dataset.csv"
+WEATHER_FILE = WEATHER_FOLDER / "weather.csv"
+
 DAY_OFF_COLUMNS = [
     "is_fr_public_holiday",
     "is_fr_school_holiday_zone_a",
@@ -37,6 +48,26 @@ DAY_OFF_COLUMNS = [
     "is_dest_school_holiday",
     "is_weekend",
 ]
+
+WEATHER_FEATURE_COLUMNS = [
+    "precipitation_sum",
+    "rain_sum",
+    "snowfall_sum",
+    "windspeed_10m_max",
+]
+
+WEATHER_BASE_PARAMS = {
+    "latitude": 45.7589,
+    "longitude": 4.8414,
+    "daily": ",".join(WEATHER_FEATURE_COLUMNS),
+    "timezone": "Europe/Paris",
+}
+
+
+def ensure_data_directories() -> None:
+    DATA_FOLDER.mkdir(exist_ok=True)
+    WEATHER_FOLDER.mkdir(exist_ok=True)
+    HOLIDAYS_FOLDER.mkdir(exist_ok=True)
 
 
 def _normalize_filename(filename: str) -> str:
@@ -148,150 +179,158 @@ def _load_destination_holidays_dataset() -> pd.DataFrame:
     return holidays
 
 
+def _build_weather_datasets() -> pd.DataFrame:
+    archive_end_date = pd.Timestamp.now(tz="Europe/Paris").date() - timedelta(days=2)
+
+    archive_response = requests.get(
+        "https://archive-api.open-meteo.com/v1/archive",
+        params={
+            **WEATHER_BASE_PARAMS,
+            "start_date": "2023-01-01",
+            "end_date": archive_end_date.isoformat(),
+        },
+        timeout=60,
+    )
+    archive_response.raise_for_status()
+    archive_json = archive_response.json()
+
+    forecast_response = requests.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            **WEATHER_BASE_PARAMS,
+            "past_days": 30,
+            "forecast_days": 16,
+        },
+        timeout=60,
+    )
+    forecast_response.raise_for_status()
+    forecast_json = forecast_response.json()
+
+    archive_daily = archive_json.get("daily")
+    forecast_daily = forecast_json.get("daily")
+    if archive_daily is None or forecast_daily is None:
+        raise RuntimeError("Open-Meteo response is missing the 'daily' payload.")
+
+    df_archive = pd.DataFrame(archive_daily)
+    df_forecast = pd.DataFrame(forecast_daily)
+
+    weather_dataset = pd.concat([df_archive, df_forecast], ignore_index=True)
+    weather_dataset = weather_dataset.drop_duplicates(subset=["time"], keep="first")
+    weather_dataset = weather_dataset.sort_values("time").reset_index(drop=True)
+    return weather_dataset
+
+
+def _drop_existing_weather_columns(dataset: pd.DataFrame) -> pd.DataFrame:
+    weather_columns_to_drop = [
+        column_name
+        for column_name in dataset.columns
+        if column_name in WEATHER_FEATURE_COLUMNS
+        or (column_name.endswith("_x") and column_name[:-2] in WEATHER_FEATURE_COLUMNS)
+        or (column_name.endswith("_y") and column_name[:-2] in WEATHER_FEATURE_COLUMNS)
+    ]
+    if weather_columns_to_drop:
+        return dataset.drop(columns=weather_columns_to_drop)
+    return dataset
+
+
+def _get_required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
 def load_main_dataset() -> None:
     """
-    Exécute un SELECT * sur une table BigQuery et affiche les résultats.
-
-    Args:
-        project_id (str): L'ID du projet GCP.
-        dataset_id (str): L'ID du dataset BigQuery.
-        table_id (str): L'ID de la table BigQuery.
-        service_account_key_path (str): Le chemin vers le fichier JSON de la clé du compte de service.
+    Download the main dataset from BigQuery if it is not already present locally.
     """
+
+    ensure_data_directories()
 
     if MAIN_DATASET_FILE.exists():
         print(f"\tMain dataset already exists at {MAIN_DATASET_FILE}. Skipping download.")
         return
 
-    # Configure les identifiants du compte de service
-    project_id = os.getenv("PROJECT_ID")
-    dataset_id = os.getenv("DATASET_ID")
-    table_id = os.getenv("TABLE_ID")
-    service_account_key_path = os.getenv("SERVICE_ACCOUNT_KEY_PATH")
+    if bigquery is None:
+        raise ImportError("google-cloud-bigquery is required to download the main dataset.")
 
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+    project_id = _get_required_env("PROJECT_ID")
+    dataset_id = _get_required_env("DATASET_ID")
+    table_id = _get_required_env("TABLE_ID")
+    service_account_key_path = os.getenv("SERVICE_ACCOUNT_KEY_PATH") or os.getenv("YOUR_SERVICE_ACCOUNT_KEY_PATH")
+
+    if service_account_key_path:
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
 
     table_ref = f"`{project_id}.{dataset_id}.{table_id}`"
-
     query = f"SELECT * FROM {table_ref};"
 
-    # Initialise le client BigQuery
     client = bigquery.Client(project=project_id)
-
-    # Construit la référence complète de la table
-    print(f"\tExécution de la requête sur BigQuery: {query}\n")
+    print(f"\tRunning BigQuery query: {query}\n")
 
     query_job = client.query(query)
-
-    print("\tGot response")
-
-    # Récupère les résultats
     rows: Iterator[Row] = query_job.result()
+    total_rows = getattr(rows, "total_rows", 0) or 0
 
-    print(f"\tRequête terminée. {rows.total_rows} lignes récupérées.")
+    print(f"\tQuery completed. {total_rows} rows retrieved.")
 
-    progress_bar = ProgressBar(rows.total_rows, update_every=max(1, rows.total_rows // 100))
-    progress_bar.start()
+    progress_bar = None
+    if total_rows > 0:
+        progress_bar = ProgressBar(total_rows, update_every=max(1, total_rows // 100))
+        progress_bar.start()
 
     dataset_rows = []
-
     for row in rows:
         dataset_rows.append(dict(row.items()))
-        progress_bar.increment()
+        if progress_bar is not None:
+            progress_bar.increment()
 
-    progress_bar.finish()
+    if progress_bar is not None:
+        progress_bar.finish()
 
     dataset = pd.DataFrame(dataset_rows)
-    dataset.to_csv(MAIN_DATASET_FILE, index=False)
-    dataset.to_csv(ORIGINAL_DATASET_FILE, index=False)
+    dataset.to_csv(MAIN_DATASET_FILE, index=False, encoding="utf-8-sig")
+    dataset.to_csv(ORIGINAL_DATASET_FILE, index=False, encoding="utf-8-sig")
 
     print(f"\tMain dataset saved to {MAIN_DATASET_FILE}")
 
 
-def load_weather_data():
+def load_weather_data() -> None:
+    ensure_data_directories()
+
     if WEATHER_FILE.exists():
         print(f"Weather dataset already exists at {WEATHER_FILE}. Skipping download.")
         weather_dataset = pd.read_csv(WEATHER_FILE)
     else:
-
-        # 1. Define our API endpoints (using JSON)
-        # Archive API: From Jan 1, 2023 up to today (it will automatically stop at its most recent available day)
-        url_archive = "https://archive-api.open-meteo.com/v1/archive?latitude=45.7589&longitude=4.8414&start_date=2023-01-01&end_date=2026-03-25&daily=precipitation_sum,rain_sum,snowfall_sum,windspeed_10m_max&timezone=Europe%2FParis"
-
-        # Forecast API: We use past_days=30 to ensure we cover any gap, plus forecast_days=16
-        url_forecast = "https://api.open-meteo.com/v1/forecast?latitude=45.7589&longitude=4.8414&past_days=30&forecast_days=16&daily=precipitation_sum,rain_sum,snowfall_sum,windspeed_10m_max&timezone=Europe%2FParis"
-
-        # 2. Fetch the data from the web
-        print("Fetching Archive data...")
-        archive_data = requests.get(url_archive).json()["daily"]
-
-        print("Fetching Forecast data...")
-        forecast_data = requests.get(url_forecast).json()["daily"]
-
-        # 3. Convert both into Pandas DataFrames
-        df_archive = pd.DataFrame(archive_data)
-        df_forecast = pd.DataFrame(forecast_data)
-
-        # 4. Stitch them together
-        # We stack them on top of each other. df_archive is first, df_forecast is second.
-        weather_dataset = pd.concat([df_archive, df_forecast])
-
-        # 5. The Magic Step: Drop duplicates
-        # We drop rows with the same date ('time').
-        # keep='first' means if a date exists in both datasets, we keep the Archive version,
-        # which is preferred because historical data is finalized and more accurate than past forecasts.
-        weather_dataset = weather_dataset.drop_duplicates(subset=["time"], keep="first")
-
-        # 6. Sort chronologically just to be perfectly safe, and reset the row numbers
-        weather_dataset = weather_dataset.sort_values("time").reset_index(drop=True)
-        weather_dataset.to_csv(WEATHER_FILE, index=False)
+        print("Fetching weather archive and forecast data...")
+        weather_dataset = _build_weather_datasets()
+        weather_dataset.to_csv(WEATHER_FILE, index=False, encoding="utf-8-sig")
         print(f"Weather dataset saved to {WEATHER_FILE}")
 
+    if not MAIN_DATASET_FILE.exists():
+        raise FileNotFoundError(f"Main dataset not found at {MAIN_DATASET_FILE}")
+
     main_dataset = pd.read_csv(MAIN_DATASET_FILE)
-
-    # 2. Convert the main column (in dataframe) to datetime so we can manipulate it
-    main_dataset["LTScheduledDatetime"] = pd.to_datetime(
-        main_dataset["LTScheduledDatetime"], format="%Y-%m-%d %H:%M:%S"
-    )
-
-    # 3. Extract JUST the date into a temporary string column (e.g., '2026-04-22')
+    main_dataset["LTScheduledDatetime"] = pd.to_datetime(main_dataset["LTScheduledDatetime"], errors="coerce")
     main_dataset["Temp_Date_Match"] = main_dataset["LTScheduledDatetime"].dt.strftime("%Y-%m-%d")
 
-    # 4. Standardize the second dataset's 'time' column to the exact same string format.
-    # (We convert it to datetime first just in case, then format it as a string)
-    weather_dataset["time"] = pd.to_datetime(weather_dataset["time"]).dt.strftime("%Y-%m-%d")
+    weather_dataset = weather_dataset.copy()
+    weather_dataset["time"] = pd.to_datetime(weather_dataset["time"], errors="coerce").dt.strftime("%Y-%m-%d")
 
-    # Ensure weather columns are refreshed cleanly if this function is rerun.
-    weather_features = {"precipitation_sum", "rain_sum", "snowfall_sum", "windspeed_10m_max"}
-    weather_columns_to_drop = [
-        column_name
-        for column_name in main_dataset.columns
-        if column_name in weather_features
-        or (column_name.endswith("_x") and column_name[:-2] in weather_features)
-        or (column_name.endswith("_y") and column_name[:-2] in weather_features)
-    ]
-    if weather_columns_to_drop:
-        main_dataset = main_dataset.drop(columns=weather_columns_to_drop)
-
-    # 5. Merge them!
+    main_dataset = _drop_existing_weather_columns(main_dataset)
     df_merged = pd.merge(main_dataset, weather_dataset, left_on="Temp_Date_Match", right_on="time", how="left")
-
-    # 6. Clean up (drop the temporary column and the redundant 'time' column)
-    df_merged = df_merged.drop(columns=["Temp_Date_Match", "time"])
-
-    # 7. Save it back to CSV
-    df_merged.to_csv(MAIN_DATASET_FILE, index=False)
+    df_merged = df_merged.drop(columns=["Temp_Date_Match", "time"], errors="ignore")
+    df_merged.to_csv(MAIN_DATASET_FILE, index=False, encoding="utf-8-sig")
 
     print(f"Success! Saved {len(weather_dataset)} days of continuous weather data.")
 
 
-def load_holiday_data():
+def load_holiday_data() -> None:
     from jours_feries_france import JoursFeries
     from vacances_scolaires_france import SchoolHolidayDates
 
-    # =========================
-    # 1. Download data
-    # =========================
+    if not MAIN_DATASET_FILE.exists():
+        raise FileNotFoundError(f"Main dataset not found at {MAIN_DATASET_FILE}")
 
     flights = pd.read_csv(MAIN_DATASET_FILE)
     airports = _load_airports_dataset()
@@ -313,98 +352,56 @@ def load_holiday_data():
         "days_until_next_day_off",
         "days_until_next_workday",
     ]
-    existing_derived = [column_name for column_name in derived_columns if column_name in flights.columns]
-    if existing_derived:
-        flights = flights.drop(columns=existing_derived)
+    flights = flights.drop(columns=[column for column in derived_columns if column in flights.columns])
 
     flights["LTScheduledDatetime"] = pd.to_datetime(flights["LTScheduledDatetime"], errors="coerce")
-
-    # Number of day of the week : 0=monday ... 6=sunday
     flights["day_of_week"] = flights["LTScheduledDatetime"].dt.dayofweek
-
-    # Weekend : 1 if saturday or sunday, otherwise 0
     flights["is_weekend"] = flights["day_of_week"].isin([5, 6]).astype(int)
-
-    # Date used to join
     flights["date"] = flights["LTScheduledDatetime"].dt.normalize()
     flights["date_only"] = flights["LTScheduledDatetime"].dt.date
-
-    def get_season(month):
-        if month in [12, 1, 2]:
-            return "winter"
-        elif month in [3, 4, 5]:
-            return "spring"
-        elif month in [6, 7, 8]:
-            return "summer"
-        else:
-            return "autumn"
-
-    flights["season"] = flights["LTScheduledDatetime"].dt.month.apply(get_season)
-
-    # =========================
-    # 3. MAPPING AIRPORT -> COUNTRY
-    # =========================
+    flights["season"] = flights["LTScheduledDatetime"].dt.month.apply(_get_season)
 
     if not airports.empty and "AirportPrevious" in flights.columns:
         flights = flights.merge(airports, on="AirportPrevious", how="left")
     else:
         flights["dest_country"] = np.nan
 
-    # =========================
-    # 4. FRANCE : PUBLIC HOLIDAY
-    # =========================
-
     years = sorted(flights["LTScheduledDatetime"].dt.year.dropna().astype(int).unique())
 
     fr_public_holidays = set()
-    for y in years:
-        holidays_dict = JoursFeries.for_year(y, zone="Métropole")
+    for year in years:
+        holidays_dict = JoursFeries.for_year(year, zone="Métropole")
         fr_public_holidays.update(holidays_dict.values())
-
     flights["is_fr_public_holiday"] = flights["date_only"].isin(fr_public_holidays).astype(int)
 
-    # =========================
-    # 5. FRANCE : SCHOOL HOLIDAY
-    # =========================
-    # Lyon = zone A
-
     school_holidays = SchoolHolidayDates()
-
     fr_school_holidays_zone_a = set()
-    for y in years:
-        year_holidays = school_holidays.holidays_for_year_and_zone(y, "A")
+    for year in years:
+        year_holidays = school_holidays.holidays_for_year_and_zone(year, "A")
         fr_school_holidays_zone_a.update(year_holidays.keys())
-
     flights["is_fr_school_holiday_zone_a"] = flights["date_only"].isin(fr_school_holidays_zone_a).astype(int)
-
-    # =========================
-    # 6. DESTINATION : HOLIDAYS
-    # =========================
 
     if holidays.empty:
         dest_public = pd.DataFrame(columns=["dest_country", "date", "is_dest_public_holiday"])
         dest_school = pd.DataFrame(columns=["dest_country", "date", "is_dest_school_holiday"])
     else:
+        holidays = holidays.copy()
         holidays["type"] = holidays["type"].replace({"public_holiday": "public", "school_holiday": "school"})
-
         holidays["start_date"] = pd.to_datetime(holidays["start_date"], errors="coerce")
         holidays["end_date"] = pd.to_datetime(holidays["end_date"], errors="coerce")
-
         holidays = holidays.dropna(subset=["country_code", "type", "start_date", "end_date"])
         holidays["date"] = holidays.apply(
-            lambda row: pd.date_range(row["start_date"], row["end_date"], freq="D"), axis=1
+            lambda row: pd.date_range(row["start_date"], row["end_date"], freq="D"),
+            axis=1,
         )
         holiday_days = holidays.explode("date")[["country_code", "type", "date"]].drop_duplicates()
 
-        # destination country : public holiday
         dest_public = (
             holiday_days[holiday_days["type"] == "public"][["country_code", "date"]]
             .rename(columns={"country_code": "dest_country"})
             .drop_duplicates()
             .assign(is_dest_public_holiday=1)
         )
-
-        # destination country : school holiday
         dest_school = (
             holiday_days[holiday_days["type"] == "school"][["country_code", "date"]]
             .rename(columns={"country_code": "dest_country"})
@@ -413,24 +410,30 @@ def load_holiday_data():
         )
 
     flights = flights.merge(dest_public, on=["dest_country", "date"], how="left")
-
     flights = flights.merge(dest_school, on=["dest_country", "date"], how="left")
 
     flights["is_dest_public_holiday"] = flights["is_dest_public_holiday"].fillna(0).astype(int)
     flights["is_dest_school_holiday"] = flights["is_dest_school_holiday"].fillna(0).astype(int)
+    flights = flights.drop(columns=["date", "date_only"], errors="ignore")
 
-    flights = flights.drop(columns=["date", "date_only"])
-
-    # =========================
-    # 7. EXPORT
-    # =========================
-
-    flights.to_csv(DATA_FOLDER / "main_dataset.csv", index=False, encoding="utf-8-sig")
-
-    # os.system("pip uninstall jours_feries_france vacances_scolaires_france -y")
+    flights.to_csv(MAIN_DATASET_FILE, index=False, encoding="utf-8-sig")
+    print(f"Holiday features saved to {MAIN_DATASET_FILE}")
 
 
-def merge_datasets():
+def _get_season(month: float) -> str | None:
+    if pd.isna(month):
+        return None
+    month = int(month)
+    if month in [12, 1, 2]:
+        return "winter"
+    if month in [3, 4, 5]:
+        return "spring"
+    if month in [6, 7, 8]:
+        return "summer"
+    return "autumn"
+
+
+def merge_datasets() -> None:
     load_weather_data()
     load_holiday_data()
     apply_preprocessing()
@@ -476,6 +479,17 @@ def add_day_off_countdown_features(flights: pd.DataFrame) -> pd.DataFrame:
     processed = flights.copy()
     ensure_day_off_columns_exist(processed)
 
+    stale_countdown_columns = [
+        "scheduled_date",
+        "is_any_day_off",
+        "days_until_next_day_off",
+        "days_until_next_workday",
+    ]
+    processed = processed.drop(columns=[column for column in stale_countdown_columns if column in processed.columns])
+
+    if "dest_country" not in processed.columns:
+        processed["dest_country"] = np.nan
+
     processed["scheduled_date"] = processed["LTScheduledDatetime"].dt.normalize()
     processed["dest_country"] = processed["dest_country"].fillna("__UNKNOWN__")
 
@@ -491,17 +505,13 @@ def add_day_off_countdown_features(flights: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
-    countdown_frames = []
-    for _, group in daily_calendar.groupby("dest_country", sort=False):
-        countdown_frames.append(compute_group_day_off_countdowns(group))
+    countdown_frames = [
+        compute_group_day_off_countdowns(group) for _, group in daily_calendar.groupby("dest_country", sort=False)
+    ]
 
     if countdown_frames:
         countdowns = pd.concat(countdown_frames, ignore_index=True)
-        processed = processed.merge(
-            countdowns,
-            on=["dest_country", "scheduled_date"],
-            how="left",
-        )
+        processed = processed.merge(countdowns, on=["dest_country", "scheduled_date"], how="left")
     else:
         processed["days_until_next_day_off"] = np.nan
         processed["days_until_next_workday"] = np.nan
@@ -545,27 +555,8 @@ def compute_group_day_off_countdowns(group: pd.DataFrame) -> pd.DataFrame:
     return group[["dest_country", "scheduled_date", "days_until_next_day_off", "days_until_next_workday"]]
 
 
-# --- Configuration et exécution du script ---
 if __name__ == "__main__":
     load_dotenv()
-
-    DATA_FOLDER = Path("data/")
-    DATA_FOLDER.mkdir(exist_ok=True)
-
-    WEATHER_FOLDER = DATA_FOLDER / "weather"
-    WEATHER_FOLDER.mkdir(exist_ok=True)
-
-    HOLIDAYS_FOLDER = DATA_FOLDER / "holidays"
-    HOLIDAYS_FOLDER.mkdir(exist_ok=True)
-
-    ORIGINAL_DATASET_FILE = DATA_FOLDER / "original_dataset.csv"
-    MAIN_DATASET_FILE = DATA_FOLDER / "main_dataset.csv"
-    WEATHER_FILE = WEATHER_FOLDER / "weather.csv"
-
-    # if input("This operation is about to delete and redownload the entire dataset. Proceed? (Y/N): ").lower() != "y":
-    #     quit()
-
-    #
+    ensure_data_directories()
     load_main_dataset()
-    #
     merge_datasets()
