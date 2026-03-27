@@ -90,40 +90,40 @@ if __name__ == "__main__":
             **clean_model_params(results["LGBMRegressor"]["best_params"]),
         )
 
-    # if "DecisionTreeRegressor" in results:
-    #     regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
-    #         **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
-    #     )
-    # if "RandomForestRegressor" in results:
-    #     regressors["RandomForestRegressor"] = RandomForestRegressor(
-    #         **clean_model_params(results["RandomForestRegressor"]["best_params"])
-    #     )
-    # if "ExtraTreesRegressor" in results:
-    #     regressors["ExtraTreesRegressor"] = ExtraTreesRegressor(
-    #         **clean_model_params(results["ExtraTreesRegressor"]["best_params"])
-    #     )
-    # if "CatBoostRegressor" in results:
-    #     regressors["CatBoostRegressor"] = CatBoostRegressor(
-    #         loss_function="MAE",
-    #         verbose=False,
-    #         random_seed=42,
-    #         allow_writing_files=False,
-    #         **params_without(
-    #             clean_model_params(results["CatBoostRegressor"]["best_params"]),
-    #             "loss_function",
-    #             "verbose",
-    #             "random_seed",
-    #             "allow_writing_files",
-    #         ),
-    #     )
-    # if "GradientBoostingRegressor" in results:
-    #     regressors["GradientBoostingRegressor"] = GradientBoostingRegressor(
-    #         **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
-    #     )
-    # if "HistGradientBoostingRegressor" in results:
-    #     regressors["HistGradientBoostingRegressor"] = HistGradientBoostingRegressor(
-    #         **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
-    #     )
+    if "DecisionTreeRegressor" in results:
+        regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
+            **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
+        )
+    if "RandomForestRegressor" in results:
+        regressors["RandomForestRegressor"] = RandomForestRegressor(
+            **clean_model_params(results["RandomForestRegressor"]["best_params"])
+        )
+    if "ExtraTreesRegressor" in results:
+        regressors["ExtraTreesRegressor"] = ExtraTreesRegressor(
+            **clean_model_params(results["ExtraTreesRegressor"]["best_params"])
+        )
+    if "CatBoostRegressor" in results:
+        regressors["CatBoostRegressor"] = CatBoostRegressor(
+            loss_function="MAE",
+            verbose=False,
+            random_seed=42,
+            allow_writing_files=False,
+            **params_without(
+                clean_model_params(results["CatBoostRegressor"]["best_params"]),
+                "loss_function",
+                "verbose",
+                "random_seed",
+                "allow_writing_files",
+            ),
+        )
+    if "GradientBoostingRegressor" in results:
+        regressors["GradientBoostingRegressor"] = GradientBoostingRegressor(
+            **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
+        )
+    if "HistGradientBoostingRegressor" in results:
+        regressors["HistGradientBoostingRegressor"] = HistGradientBoostingRegressor(
+            **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
+        )
 
     if not regressors:
         raise RuntimeError("No enabled regressors found in hyperparameters.json.")
