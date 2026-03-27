@@ -26,4 +26,5 @@ torch
 
 # Misc
 requests
+tqdm
 google-cloud-bigquery
