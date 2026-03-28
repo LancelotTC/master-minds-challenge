@@ -288,7 +288,20 @@ def load_weather_data() -> None:
         raise FileNotFoundError(f"Main dataset not found at {MAIN_DATASET_FILE}")
 
     main_dataset = pd.read_csv(MAIN_DATASET_FILE)
-    main_dataset["LTScheduledDatetime"] = pd.to_datetime(main_dataset["LTScheduledDatetime"], errors="coerce")
+
+    # 2. Convert the main column (in dataframe) to datetime so we can manipulate it
+    main_dataset["LTScheduledDatetime"] = pd.to_datetime(
+        main_dataset["LTScheduledDatetime"], format="%Y-%m-%d %H:%M:%S"
+    )
+
+    # Drop any existing weather columns to avoid duplicate suffix conflicts on re-run
+    weather_cols = ["precipitation_sum", "rain_sum", "snowfall_sum", "windspeed_10m_max"]
+    existing_weather_cols = [
+        c for c in main_dataset.columns if any(c == w or c.startswith(w + "_") for w in weather_cols)
+    ]
+    main_dataset = main_dataset.drop(columns=existing_weather_cols)
+
+    # 3. Extract JUST the date into a temporary string column (e.g., '2026-04-22')
     main_dataset["Temp_Date_Match"] = main_dataset["LTScheduledDatetime"].dt.strftime("%Y-%m-%d")
 
     weather_dataset = weather_dataset.copy()
@@ -333,12 +346,54 @@ def load_holiday_data() -> None:
     flights["is_weekend"] = flights["day_of_week"].isin([5, 6]).astype(int)
     flights["date"] = flights["LTScheduledDatetime"].dt.normalize()
     flights["date_only"] = flights["LTScheduledDatetime"].dt.date
-    flights["season"] = flights["LTScheduledDatetime"].dt.month.apply(_get_season)
 
-    if not airports.empty and "AirportPrevious" in flights.columns:
-        flights = flights.merge(airports, on="AirportPrevious", how="left")
-    else:
-        flights["dest_country"] = np.nan
+    def get_season(month):
+        if month in [12, 1, 2]:
+            return "winter"
+        elif month in [3, 4, 5]:
+            return "spring"
+        elif month in [6, 7, 8]:
+            return "summer"
+        else:
+            return "autumn"
+
+    flights["season"] = flights["LTScheduledDatetime"].dt.month.apply(get_season)
+
+    # =========================
+    # 3. MAPPING AIRPORT -> COUNTRY
+    # =========================
+
+    # Drop columns that may already exist from a previous run to avoid _x/_y suffix conflicts
+    cols_to_reset = [
+        "dest_country",
+        "is_domestic",
+        "is_fr_public_holiday",
+        "is_bridge_day",
+        "is_fr_school_holiday_zone_a",
+        "is_fr_school_holiday_zone_b",
+        "is_fr_school_holiday_zone_c",
+        "is_fr_school_zone_b_and_c",
+        "is_first_last_day_of_school_holiday",
+        "is_dest_public_holiday",
+        "is_dest_school_holiday",
+    ]
+    flights = flights.drop(columns=[c for c in cols_to_reset if c in flights.columns])
+
+    # Load the airport lookup once and reuse for all mappings
+    airports_lookup = pd.read_csv(HOLIDAYS_FOLDER / "upply-airports.csv", sep=";")[["code", "country_code"]]
+
+    # Map AirportOrigin -> dest_country
+    # AirportOrigin uses IATA codes (3-letter) which match upply-airports.csv
+    airports_dest = airports_lookup.rename(columns={"code": "AirportOrigin", "country_code": "dest_country"})
+    airports_dest = airports_dest[["AirportOrigin", "dest_country"]].drop_duplicates()
+    flights = flights.merge(airports_dest, on="AirportOrigin", how="left")
+
+    # is_domestic: 1 if dest_country is France, 0 otherwise, None if dest_country is unknown
+    flights["is_domestic"] = flights["dest_country"].map(lambda c: 1 if c == "FR" else (0 if pd.notna(c) else None))
+
+    # =========================
+    # 4. FRANCE : PUBLIC HOLIDAY
+    # =========================
 
     years = sorted(flights["LTScheduledDatetime"].dt.year.dropna().astype(int).unique())
 
@@ -348,6 +403,21 @@ def load_holiday_data() -> None:
         fr_public_holidays.update(holidays_dict.values())
     flights["is_fr_public_holiday"] = flights["date_only"].isin(fr_public_holidays).astype(int)
 
+    # is_bridge_day: a weekday sandwiched between a public holiday and a weekend
+    # Friday (dow=4) whose Thursday was a public holiday, or Monday (dow=0) whose Tuesday will be a public holiday
+    fr_holiday_ts = set(pd.to_datetime(list(fr_public_holidays)))
+    flight_dates_ts = pd.to_datetime(flights["date_only"])
+    prev_day_is_holiday = (flight_dates_ts - pd.Timedelta(days=1)).isin(fr_holiday_ts)
+    next_day_is_holiday = (flight_dates_ts + pd.Timedelta(days=1)).isin(fr_holiday_ts)
+    flights["is_bridge_day"] = (
+        ((flights["day_of_week"] == 4) & prev_day_is_holiday) | ((flights["day_of_week"] == 0) & next_day_is_holiday)
+    ).astype(int)
+
+    # =========================
+    # 5. FRANCE : SCHOOL HOLIDAY
+    # =========================
+    # Lyon = zone A
+
     school_holidays = SchoolHolidayDates()
     fr_school_holidays_zone_a = set()
     for year in years:
@@ -355,33 +425,62 @@ def load_holiday_data() -> None:
         fr_school_holidays_zone_a.update(year_holidays.keys())
     flights["is_fr_school_holiday_zone_a"] = flights["date_only"].isin(fr_school_holidays_zone_a).astype(int)
 
-    if holidays.empty:
-        dest_public = pd.DataFrame(columns=["dest_country", "date", "is_dest_public_holiday"])
-        dest_school = pd.DataFrame(columns=["dest_country", "date", "is_dest_school_holiday"])
-    else:
-        holidays = holidays.copy()
-        holidays["type"] = holidays["type"].replace({"public_holiday": "public", "school_holiday": "school"})
-        holidays["start_date"] = pd.to_datetime(holidays["start_date"], errors="coerce")
-        holidays["end_date"] = pd.to_datetime(holidays["end_date"], errors="coerce")
-        holidays = holidays.dropna(subset=["country_code", "type", "start_date", "end_date"])
-        holidays["date"] = holidays.apply(
-            lambda row: pd.date_range(row["start_date"], row["end_date"], freq="D"),
-            axis=1,
-        )
-        holiday_days = holidays.explode("date")[["country_code", "type", "date"]].drop_duplicates()
+    fr_school_holidays_zone_b = set()
+    for y in years:
+        year_holidays = school_holidays.holidays_for_year_and_zone(y, "B")
+        fr_school_holidays_zone_b.update(year_holidays.keys())
+    flights["is_fr_school_holiday_zone_b"] = flights["date_only"].isin(fr_school_holidays_zone_b).astype(int)
 
-        dest_public = (
-            holiday_days[holiday_days["type"] == "public"][["country_code", "date"]]
-            .rename(columns={"country_code": "dest_country"})
-            .drop_duplicates()
-            .assign(is_dest_public_holiday=1)
-        )
-        dest_school = (
-            holiday_days[holiday_days["type"] == "school"][["country_code", "date"]]
-            .rename(columns={"country_code": "dest_country"})
-            .drop_duplicates()
-            .assign(is_dest_school_holiday=1)
-        )
+    fr_school_holidays_zone_c = set()
+    for y in years:
+        year_holidays = school_holidays.holidays_for_year_and_zone(y, "C")
+        fr_school_holidays_zone_c.update(year_holidays.keys())
+    flights["is_fr_school_holiday_zone_c"] = flights["date_only"].isin(fr_school_holidays_zone_c).astype(int)
+
+    # is_fr_school_zone_b_and_c: 1 if the day is a school holiday in zone B or zone C
+    all_bc_holidays_ts = set(pd.to_datetime(list(fr_school_holidays_zone_b | fr_school_holidays_zone_c)))
+    first_last_bc_ts = {
+        d
+        for d in all_bc_holidays_ts
+        if (d - pd.Timedelta(days=1)) not in all_bc_holidays_ts or (d + pd.Timedelta(days=1)) not in all_bc_holidays_ts
+    }
+    flights["is_first_last_day_of_school_holiday"] = (
+        pd.to_datetime(flights["date_only"]).isin(first_last_bc_ts)
+    ).astype(int)
+
+    # =========================
+    # 6. DESTINATION : HOLIDAYS
+    # =========================
+
+    holidays = holidays.rename(columns={"country_iso_code": "country_code", "holiday_type": "type"})
+
+    holidays["type"] = holidays["type"].replace({"public_holiday": "public", "school_holiday": "school"})
+
+    holidays["start_date"] = pd.to_datetime(holidays["start_date"], errors="coerce")
+    holidays["end_date"] = pd.to_datetime(holidays["end_date"], errors="coerce")
+
+    holidays = holidays[["country_code", "type", "start_date", "end_date"]].dropna(
+        subset=["country_code", "type", "start_date", "end_date"]
+    )
+
+    holidays["date"] = [
+        list(pd.date_range(start, end, freq="D")) for start, end in zip(holidays["start_date"], holidays["end_date"])
+    ]
+
+    holiday_days = holidays.explode("date")[["country_code", "type", "date"]].drop_duplicates()
+
+    dest_public = (
+        holiday_days[holiday_days["type"] == "public"][["country_code", "date"]]
+        .rename(columns={"country_code": "dest_country"})
+        .drop_duplicates()
+        .assign(is_dest_public_holiday=1)
+    )
+    dest_school = (
+        holiday_days[holiday_days["type"] == "school"][["country_code", "date"]]
+        .rename(columns={"country_code": "dest_country"})
+        .drop_duplicates()
+        .assign(is_dest_school_holiday=1)
+    )
 
     flights = flights.merge(dest_public, on=["dest_country", "date"], how="left")
     flights = flights.merge(dest_school, on=["dest_country", "date"], how="left")
@@ -529,8 +628,26 @@ def compute_group_day_off_countdowns(group: pd.DataFrame) -> pd.DataFrame:
     return group[["dest_country", "scheduled_date", "days_until_next_day_off", "days_until_next_workday"]]
 
 
+# --- Configuration et exécution du script ---
 if __name__ == "__main__":
     load_dotenv()
-    ensure_data_directories()
-    load_main_dataset()
+
+    DATA_FOLDER = Path("data/")
+    DATA_FOLDER.mkdir(exist_ok=True)
+
+    WEATHER_FOLDER = DATA_FOLDER / "weather"
+    WEATHER_FOLDER.mkdir(exist_ok=True)
+
+    HOLIDAYS_FOLDER = DATA_FOLDER / "holidays"
+    HOLIDAYS_FOLDER.mkdir(exist_ok=True)
+
+    ORIGINAL_DATASET_FILE = DATA_FOLDER / "original_dataset.csv"
+    MAIN_DATASET_FILE = DATA_FOLDER / "main_dataset.csv"
+    ENRICHED_DATASET_FILE = DATA_FOLDER / "enriched_dataset.csv"
+    WEATHER_FILE = WEATHER_FOLDER / "weather.csv"
+
+    if input("This operation is about to delete and redownload the entire dataset. Proceed? (Y/N): ").lower() != "y":
+        quit()
+
+    # load_main_dataset()
     merge_datasets()
