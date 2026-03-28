@@ -17,6 +17,7 @@ scikit-optimize
 xgboost
 catboost
 lightgbm
+codecarbon
 
 prophet
 
