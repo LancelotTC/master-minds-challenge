@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "description": "Example only. Set enabled to true to ensure NbPaxTotalPrediction never exceeds NbOfSeats.",
+  "prediction_overrides": [
+    {
+      "name": "cap_prediction_to_seats",
+      "clip_upper_column": "NbOfSeats"
+    }
+  ]
+}

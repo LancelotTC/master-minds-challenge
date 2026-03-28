@@ -19,7 +19,12 @@ from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
 from tqdm.auto import tqdm
 
-from movement_model_utils import load_training_and_prediction_frames, make_preprocessor
+from movement_model_utils import (
+    build_datewise_cv_splits,
+    load_training_and_prediction_frames,
+    make_preprocessor,
+    sort_features_and_target_by_datetime,
+)
 
 RANDOM_SEED = 42
 TRAINING_DATASET_SIZE = 100_000
@@ -77,6 +82,7 @@ def build_search_profile(training_rows: int) -> dict[str, int]:
 
 def prepare_data():
     features, target, _, _ = load_training_and_prediction_frames()
+    features, target = sort_features_and_target_by_datetime(features, target)
 
     if TRAINING_DATASET_SIZE is not None:
         if TRAINING_DATASET_SIZE <= 0:
@@ -84,12 +90,8 @@ def prepare_data():
 
         effective_training_size = resolve_effective_training_size(len(features))
         if effective_training_size < len(features):
-            sampled_indices = features.sample(
-                n=effective_training_size,
-                random_state=TRAINING_DATASET_SUBSAMPLE_SEED,
-            ).index
-            features = features.loc[sampled_indices].copy()
-            target = target.loc[sampled_indices].copy()
+            features = features.tail(effective_training_size).copy()
+            target = target.loc[features.index].copy()
 
     return features, target
 
@@ -340,6 +342,7 @@ def test_regressors(features, target, n_rounds=3):
     results_path = RESULTS_PATH
     results = {}
     effective_training_rows = len(features)
+    cv_splits = build_datewise_cv_splits(features, CV_FOLDS)
 
     if results_path.exists():
         try:
@@ -364,7 +367,7 @@ def test_regressors(features, target, n_rounds=3):
                 model,
                 params,
                 n_iter=SEARCH_ITERATIONS,
-                cv=CV_FOLDS,
+                cv=cv_splits,
                 scoring="neg_mean_absolute_error",
                 n_jobs=JOBS,
                 random_state=base_seed + round_idx,
