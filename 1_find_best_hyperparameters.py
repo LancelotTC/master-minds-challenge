@@ -99,69 +99,69 @@ def build_models(features):
     search_profile = build_search_profile(len(features))
 
     return {
-        "CatBoostRegressor": (
+        # "CatBoostRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             (
+        #                 "model",
+        #                 CatBoostRegressor(
+        #                     verbose=False,
+        #                     random_seed=RANDOM_SEED,
+        #                     allow_writing_files=False,
+        #                 ),
+        #             ),
+        #         ]
+        #     ),
+        #     {
+        #         "model__depth": integer_range(4, search_profile["catboost_depth_upper"]),
+        #         "model__n_estimators": integer_range(200, search_profile["boosting_estimators_upper"]),
+        #         "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
+        #         "model__random_strength": Real(0.1, 3.0, prior="log-uniform"),
+        #         "model__subsample": Real(0.65, 1.0),
+        #         "model__rsm": Real(0.6, 1.0),
+        #         "model__min_data_in_leaf": integer_range(20, search_profile["catboost_min_data_in_leaf_upper"]),
+        #         "model__leaf_estimation_method": Categorical(["Gradient"]),
+        #         "model__loss_function": Categorical(["MAE"]),
+        #     },
+        # ),
+        "XGBRegressor": (
             Pipeline(
                 [
                     ("preprocess", preprocessor),
-                    (
-                        "model",
-                        CatBoostRegressor(
-                            verbose=False,
-                            random_seed=RANDOM_SEED,
-                            allow_writing_files=False,
-                        ),
-                    ),
+                    ("model", XGBRegressor(random_state=RANDOM_SEED)),
                 ]
             ),
             {
-                "model__depth": integer_range(4, search_profile["catboost_depth_upper"]),
                 "model__n_estimators": integer_range(200, search_profile["boosting_estimators_upper"]),
                 "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
-                "model__random_strength": Real(0.1, 3.0, prior="log-uniform"),
+                "model__max_depth": integer_range(3, search_profile["boosting_depth_upper"]),
                 "model__subsample": Real(0.65, 1.0),
-                "model__rsm": Real(0.6, 1.0),
-                "model__min_data_in_leaf": integer_range(20, search_profile["catboost_min_data_in_leaf_upper"]),
-                "model__leaf_estimation_method": Categorical(["Gradient"]),
-                "model__loss_function": Categorical(["MAE"]),
+                "model__colsample_bytree": Real(0.6, 1.0),
+                "model__gamma": Real(0.0, 2.0),
+                "model__reg_lambda": Real(0.1, 8.0, prior="log-uniform"),
+                "model__min_child_weight": integer_range(1, search_profile["xgb_min_child_weight_upper"]),
+                "model__objective": Categorical(["reg:absoluteerror"]),
+                "model__eval_metric": Categorical(["mae"]),
+                "model__tree_method": Categorical(["hist"]),
             },
         ),
-        # "XGBRegressor": (
-        #     Pipeline(
-        #         [
-        #             ("preprocess", preprocessor),
-        #             ("model", XGBRegressor(random_state=RANDOM_SEED)),
-        #         ]
-        #     ),
-        #     {
-        #         "model__n_estimators": integer_range(200, search_profile["boosting_estimators_upper"]),
-        #         "model__learning_rate": Real(0.01, 0.15, prior="log-uniform"),
-        #         "model__max_depth": integer_range(3, search_profile["boosting_depth_upper"]),
-        #         "model__subsample": Real(0.65, 1.0),
-        #         "model__colsample_bytree": Real(0.6, 1.0),
-        #         "model__gamma": Real(0.0, 2.0),
-        #         "model__reg_lambda": Real(0.1, 8.0, prior="log-uniform"),
-        #         "model__min_child_weight": integer_range(1, search_profile["xgb_min_child_weight_upper"]),
-        #         "model__objective": Categorical(["reg:absoluteerror"]),
-        #         "model__eval_metric": Categorical(["mae"]),
-        #         "model__tree_method": Categorical(["hist"]),
-        #     },
-        # ),
-        # "DecisionTreeRegressor": (
-        #     Pipeline(
-        #         [
-        #             ("preprocess", preprocessor),
-        #             ("model", DecisionTreeRegressor(random_state=RANDOM_SEED)),
-        #         ]
-        #     ),
-        #     {
-        #         "model__max_depth": integer_range(4, search_profile["tree_depth_upper"]),
-        #         "model__criterion": Categorical(["absolute_error"]),
-        #         "model__min_samples_split": integer_range(2, search_profile["tree_min_samples_split_upper"]),
-        #         "model__min_samples_leaf": integer_range(1, search_profile["tree_min_samples_leaf_upper"]),
-        #         "model__max_features": Categorical([None, "sqrt", "log2"]),
-        #         "model__ccp_alpha": Real(1e-6, 1e-2, prior="log-uniform"),
-        #     },
-        # ),
+        "DecisionTreeRegressor": (
+            Pipeline(
+                [
+                    ("preprocess", preprocessor),
+                    ("model", DecisionTreeRegressor(random_state=RANDOM_SEED)),
+                ]
+            ),
+            {
+                "model__max_depth": integer_range(4, search_profile["tree_depth_upper"]),
+                "model__criterion": Categorical(["absolute_error"]),
+                "model__min_samples_split": integer_range(2, search_profile["tree_min_samples_split_upper"]),
+                "model__min_samples_leaf": integer_range(1, search_profile["tree_min_samples_leaf_upper"]),
+                "model__max_features": Categorical([None, "sqrt", "log2"]),
+                "model__ccp_alpha": Real(1e-6, 1e-2, prior="log-uniform"),
+            },
+        ),
         # "GradientBoostingRegressor": (
         #     Pipeline(
         #         [
