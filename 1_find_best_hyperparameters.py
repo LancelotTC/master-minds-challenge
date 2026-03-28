@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from catboost import CatBoostRegressor
+from codecarbon import track_emissions
 from lightgbm import LGBMRegressor
 from skopt import BayesSearchCV
 from skopt.space import Categorical, Integer, Real
@@ -405,9 +406,14 @@ def test_regressors(features, target, n_rounds=3):
     return results
 
 
-if __name__ == "__main__":
+@track_emissions()
+def main():
     X, y = prepare_data()
     print(f"Training rows: {len(X)}")
     print(f"Feature columns: {len(X.columns)}")
     print(f"Search profile: {build_search_profile(len(X))}")
     test_regressors(X, y, n_rounds=1)
+
+
+if __name__ == "__main__":
+    main()

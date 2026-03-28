@@ -1,6 +1,8 @@
 from typing import Optional
 
 from catboost import CatBoostRegressor
+from codecarbon import track_emissions
+
 from lightgbm import LGBMRegressor
 from sklearn.ensemble import (
     ExtraTreesRegressor,
@@ -72,7 +74,8 @@ def get_predictions(model, features, target, prediction_features, step_progress=
     )
 
 
-if __name__ == "__main__":
+@track_emissions()
+def main():
     training_features, training_target, prediction_features, prediction_ids = load_training_and_prediction_frames(
         prediction_mode=PREDICTION_MODE
     )
@@ -92,36 +95,36 @@ if __name__ == "__main__":
             **clean_model_params(results["LGBMRegressor"]["best_params"]),
         )
 
-    if "DecisionTreeRegressor" in results:
-        regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
-            **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
-        )
-    if "RandomForestRegressor" in results:
-        regressors["RandomForestRegressor"] = RandomForestRegressor(
-            **clean_model_params(results["RandomForestRegressor"]["best_params"])
-        )
-    if "ExtraTreesRegressor" in results:
-        regressors["ExtraTreesRegressor"] = ExtraTreesRegressor(
-            **clean_model_params(results["ExtraTreesRegressor"]["best_params"])
-        )
-    if "CatBoostRegressor" in results:
-        regressors["CatBoostRegressor"] = CatBoostRegressor(
-            loss_function="MAE",
-            verbose=False,
-            random_seed=42,
-            allow_writing_files=False,
-            **params_without(
-                clean_model_params(results["CatBoostRegressor"]["best_params"]),
-                "loss_function",
-                "verbose",
-                "random_seed",
-                "allow_writing_files",
-            ),
-        )
-    if "GradientBoostingRegressor" in results:
-        regressors["GradientBoostingRegressor"] = GradientBoostingRegressor(
-            **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
-        )
+    # if "DecisionTreeRegressor" in results:
+    #     regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
+    #         **clean_model_params(results["DecisionTreeRegressor"]["best_params"])
+    #     )
+    # if "RandomForestRegressor" in results:
+    #     regressors["RandomForestRegressor"] = RandomForestRegressor(
+    #         **clean_model_params(results["RandomForestRegressor"]["best_params"])
+    #     )
+    # if "ExtraTreesRegressor" in results:
+    #     regressors["ExtraTreesRegressor"] = ExtraTreesRegressor(
+    #         **clean_model_params(results["ExtraTreesRegressor"]["best_params"])
+    #     )
+    # if "CatBoostRegressor" in results:
+    #     regressors["CatBoostRegressor"] = CatBoostRegressor(
+    #         loss_function="MAE",
+    #         verbose=False,
+    #         random_seed=42,
+    #         allow_writing_files=False,
+    #         **params_without(
+    #             clean_model_params(results["CatBoostRegressor"]["best_params"]),
+    #             "loss_function",
+    #             "verbose",
+    #             "random_seed",
+    #             "allow_writing_files",
+    #         ),
+    #     )
+    # if "GradientBoostingRegressor" in results:
+    #     regressors["GradientBoostingRegressor"] = GradientBoostingRegressor(
+    #         **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
+    #     )
     if "HistGradientBoostingRegressor" in results:
         regressors["HistGradientBoostingRegressor"] = HistGradientBoostingRegressor(
             **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
@@ -157,3 +160,7 @@ if __name__ == "__main__":
             )
         )
         print(f"Predictions written to {output_path}")
+
+
+if __name__ == "__main__":
+    main()
