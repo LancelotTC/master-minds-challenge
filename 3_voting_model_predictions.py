@@ -1,3 +1,5 @@
+from codecarbon import track_emissions
+
 from sklearn.ensemble import (
     ExtraTreesRegressor,
     GradientBoostingRegressor,
@@ -22,7 +24,8 @@ EXPONENT = 10
 PREDICTION_MODE = PREDICTION_MODE_MISSING_TARGET
 
 
-if __name__ == "__main__":
+@track_emissions()
+def main():
     with tqdm(total=9, desc="Voting workflow", unit="step") as progress:
         training_features, training_target, prediction_features, prediction_ids = run_progress_step(
             progress,
@@ -86,3 +89,7 @@ if __name__ == "__main__":
         )
         print(f"Predictions written to {output_path}")
         run_progress_step(progress, "plot", plot_prediction_results, output_path)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,5 @@
+from codecarbon import track_emissions
+
 from sklearn.ensemble import (
     ExtraTreesRegressor,
     GradientBoostingRegressor,
@@ -22,7 +24,8 @@ from movement_model_utils import (
 PREDICTION_MODE = PREDICTION_MODE_MISSING_TARGET
 
 
-if __name__ == "__main__":
+@track_emissions()
+def main():
     with tqdm(total=8, desc="Stacking workflow", unit="step") as progress:
         training_features, training_target, prediction_features, prediction_ids = run_progress_step(
             progress,
@@ -73,3 +76,7 @@ if __name__ == "__main__":
         )
         print(f"Predictions written to {output_path}")
         run_progress_step(progress, "plot", plot_prediction_results, output_path)
+
+
+if __name__ == "__main__":
+    main()

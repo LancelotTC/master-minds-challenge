@@ -372,6 +372,15 @@ def plot_prediction_results(
         print(f"Skipping plot for {predictions_file}: no plottable values found.")
         return None
 
+    full_plot_data = plot_data.copy()
+    actual_full = full_plot_data[TARGET_COLUMN].to_numpy(dtype=float)
+    predicted_full = full_plot_data[PREDICTION_COLUMN].to_numpy(dtype=float)
+    mean_absolute_deviation = float(np.mean(np.abs(predicted_full - actual_full)))
+    actual_mean = float(np.mean(actual_full))
+    actual_median = float(np.median(actual_full))
+    predicted_mean = float(np.mean(predicted_full))
+    predicted_median = float(np.median(predicted_full))
+
     if max_points > 0 and len(plot_data) > max_points:
         plot_data = plot_data.sample(n=max_points, random_state=42)
 
@@ -427,8 +436,25 @@ def plot_prediction_results(
     axes[1].set_title("Residuals")
     figure.colorbar(density_residual, ax=axes[1], label="log10(count)")
 
+    stats_text = "\n".join(
+        [
+            f"Mean absolute deviation: {mean_absolute_deviation:,.2f}",
+            f"Actual mean / median: {actual_mean:,.2f} / {actual_median:,.2f}",
+            f"Pred mean / median: {predicted_mean:,.2f} / {predicted_median:,.2f}",
+        ]
+    )
+    figure.text(
+        0.5,
+        0.01,
+        stats_text,
+        ha="center",
+        va="bottom",
+        fontsize=10,
+        bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.9, "edgecolor": "0.8"},
+    )
+
     figure.suptitle(f"{predictions_file.stem} (n={len(plot_data):,})")
-    figure.tight_layout(rect=(0, 0, 1, 0.96))
+    figure.tight_layout(rect=(0, 0.08, 1, 0.96))
 
     plot_path = predictions_file.with_suffix(".png")
     figure.savefig(plot_path, dpi=160, bbox_inches="tight")
