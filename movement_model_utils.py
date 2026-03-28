@@ -186,9 +186,7 @@ def load_training_and_prediction_frames(
     prediction_mode: str = PREDICTION_MODE_MISSING_TARGET,
 ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.DataFrame]:
     if prediction_mode not in {PREDICTION_MODE_MISSING_TARGET, PREDICTION_MODE_KNOWN_TARGET}:
-        raise ValueError(
-            "prediction_mode must be 'missing_target' or 'known_target'."
-        )
+        raise ValueError("prediction_mode must be 'missing_target' or 'known_target'.")
 
     raw_dataframe = load_main_dataset_dataframe(limit=limit)
     feature_dataframe = build_feature_dataframe(raw_dataframe)
@@ -286,11 +284,7 @@ def print_discarded_rows_debug(
     for row_index in discarded_features.index:
         missing_columns = discarded_features.columns[discarded_features.loc[row_index].isna()].tolist()
         row_number = discarded_raw_rows.at[row_index, ROW_ID_COLUMN]
-        movement_id = (
-            discarded_raw_rows.at[row_index, ID_COLUMN]
-            if ID_COLUMN in discarded_raw_rows.columns
-            else "N/A"
-        )
+        movement_id = discarded_raw_rows.at[row_index, ID_COLUMN] if ID_COLUMN in discarded_raw_rows.columns else "N/A"
         target_value = discarded_raw_rows.at[row_index, TARGET_COLUMN]
         print(
             f"row_number={row_number} "
@@ -304,7 +298,7 @@ def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
     categorical_columns = list(CATEGORICAL_FEATURE_COLUMNS)
     numeric_columns = [column_name for column_name in FEATURE_COLUMNS if column_name not in categorical_columns]
 
-    return ColumnTransformer(
+    preprocessor = ColumnTransformer(
         transformers=[
             (
                 "num",
@@ -330,6 +324,8 @@ def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
         ],
         remainder="drop",
     )
+    preprocessor.set_output(transform="default")
+    return preprocessor
 
 
 def write_predictions(
@@ -368,10 +364,7 @@ def plot_prediction_results(
     dataframe = pd.read_csv(predictions_file)
 
     if TARGET_COLUMN not in dataframe.columns or PREDICTION_COLUMN not in dataframe.columns:
-        print(
-            f"Skipping plot for {predictions_file}: "
-            f"requires both {TARGET_COLUMN} and {PREDICTION_COLUMN}."
-        )
+        print(f"Skipping plot for {predictions_file}: " f"requires both {TARGET_COLUMN} and {PREDICTION_COLUMN}.")
         return None
 
     plot_data = _prepare_prediction_plot_data(dataframe)

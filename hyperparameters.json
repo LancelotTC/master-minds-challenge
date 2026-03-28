@@ -1,6 +1,6 @@
 {
     "CatBoostRegressor": {
-        "best_score": -19.29741155354765,
+        "best_score": -19.185775483429783,
         "best_params": {
             "depth": 12,
             "leaf_estimation_method": "Gradient",
@@ -9,7 +9,7 @@
             "min_data_in_leaf": 20,
             "n_estimators": 1623,
             "random_strength": 0.1,
-            "rsm": 0.8540882833642301,
+            "rsm": 0.8148375042358509,
             "subsample": 1.0
         },
         "training_rows": 100000
@@ -77,16 +77,32 @@
         }
     },
     "HistGradientBoostingRegressor": {
-        "best_score": -20.96993231357994,
+        "best_score": -15.0080640278678,
         "best_params": {
             "early_stopping": false,
-            "l2_regularization": 5.417480044149132,
-            "learning_rate": 0.0056427966799774435,
+            "l2_regularization": 0.0001,
+            "learning_rate": 0.15,
             "loss": "absolute_error",
-            "max_bins": 228,
-            "max_depth": 24,
-            "max_iter": 1557,
-            "min_samples_leaf": 12
-        }
+            "max_bins": 218,
+            "max_depth": 13,
+            "max_iter": 1623,
+            "min_samples_leaf": 273
+        },
+        "training_rows": 100000
+    },
+    "LGBMRegressor": {
+        "best_score": -14.202261815544285,
+        "best_params": {
+            "colsample_bytree": 0.7196824310763862,
+            "learning_rate": 0.051658231429436756,
+            "max_depth": 13,
+            "min_child_samples": 34,
+            "n_estimators": 1623,
+            "num_leaves": 265,
+            "reg_alpha": 0.001,
+            "reg_lambda": 0.001,
+            "subsample": 0.6680432854464112
+        },
+        "training_rows": 100000
     }
 }
