@@ -42,9 +42,14 @@ BASE_FEATURE_COLUMNS = [
     "season",
     "dest_country",
     "is_fr_public_holiday",
+    "is_bridge_day",
     "is_fr_school_holiday_zone_a",
+    "is_fr_school_holiday_zone_b",
+    "is_fr_school_holiday_zone_c",
+    "is_first_last_day_of_school_holiday",
     "is_dest_public_holiday",
     "is_dest_school_holiday",
+    "is_domestic",
     "precipitation_sum",
     "rain_sum",
     "snowfall_sum",
@@ -83,6 +88,10 @@ CATEGORICAL_FEATURE_COLUMNS = {
 }
 
 NUMERIC_FEATURE_COLUMNS = set(FEATURE_COLUMNS) - CATEGORICAL_FEATURE_COLUMNS
+# New binary features are numeric (0/1/NaN)
+# is_bridge_day, is_fr_school_holiday_zone_b, is_fr_school_holiday_zone_c,
+# is_first_last_day_of_school_holiday, is_domestic, is_departure
+# → all already included in NUMERIC_FEATURE_COLUMNS via the set difference above
 REQUIRED_COLUMNS = [ID_COLUMN, TARGET_COLUMN, *FEATURE_COLUMNS]
 ProgressResult = TypeVar("ProgressResult")
 
