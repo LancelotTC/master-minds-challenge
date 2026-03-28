@@ -1,4 +1,5 @@
 import os
+import unicodedata
 from datetime import timedelta
 from pathlib import Path
 from typing import Iterator
@@ -24,10 +25,14 @@ WEATHER_FILE = WEATHER_FOLDER / "weather.csv"
 DAY_OFF_COLUMNS = [
     "is_fr_public_holiday",
     "is_fr_school_holiday_zone_a",
+    "is_origin_public_holiday",
+    "is_origin_school_holiday",
     "is_dest_public_holiday",
     "is_dest_school_holiday",
     "is_weekend",
 ]
+
+LYON_COUNTRY_CODE = "FR"
 
 WEATHER_FEATURE_COLUMNS = [
     "precipitation_sum",
@@ -77,6 +82,35 @@ def _pick_column(columns: pd.Index, candidates: list[str]) -> str | None:
     return None
 
 
+def _normalize_text_key(value: object) -> str | None:
+    if pd.isna(value):
+        return None
+
+    normalized = unicodedata.normalize("NFKD", str(value))
+    normalized = normalized.encode("ascii", "ignore").decode("ascii").strip().lower()
+    return normalized or None
+
+
+def _normalize_airport_code_series(series: pd.Series) -> pd.Series:
+    normalized = series.astype("string").str.strip().str.upper()
+    return normalized.replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA})
+
+
+def _normalize_country_code_series(series: pd.Series) -> pd.Series:
+    normalized = series.astype("string").str.strip().str.upper()
+    return normalized.replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA})
+
+
+def _normalize_direction_value(value: object) -> str | None:
+    normalized = _normalize_text_key(value)
+    letters_only = "".join(character for character in normalized or "" if character.isalpha())
+    if letters_only.startswith("arriv") or normalized in {"arrivee", "arrival"}:
+        return "arrivee"
+    if letters_only.startswith(("depart", "dpart")) or normalized in {"depart", "departure"}:
+        return "depart"
+    return normalized
+
+
 def _load_airports_dataset() -> pd.DataFrame:
     airports_candidates = [
         "upply-airports.csv",
@@ -88,9 +122,9 @@ def _load_airports_dataset() -> pd.DataFrame:
     if airports_path is None:
         print(
             f"Warning: no airport mapping CSV found in {HOLIDAYS_FOLDER}. "
-            "Destination country holiday features will default to 0."
+            "Country-dependent route features will default to missing values."
         )
-        return pd.DataFrame(columns=["AirportPrevious", "dest_country"])
+        return pd.DataFrame(columns=["airport_code", "country_code"])
 
     airports_raw = pd.read_csv(airports_path, sep=None, engine="python")
     code_column = _pick_column(
@@ -105,15 +139,19 @@ def _load_airports_dataset() -> pd.DataFrame:
     if code_column is None or country_column is None:
         print(
             f"Warning: airports CSV '{airports_path.name}' does not contain expected columns. "
-            "Destination country holiday features will default to 0."
+            "Country-dependent route features will default to missing values."
         )
-        return pd.DataFrame(columns=["AirportPrevious", "dest_country"])
+        return pd.DataFrame(columns=["airport_code", "country_code"])
 
     airports = (
-        airports_raw.rename(columns={code_column: "AirportPrevious", country_column: "dest_country"})[
-            ["AirportPrevious", "dest_country"]
+        airports_raw.rename(columns={code_column: "airport_code", country_column: "country_code"})[
+            ["airport_code", "country_code"]
         ]
-        .dropna(subset=["AirportPrevious"])
+        .assign(
+            airport_code=lambda df: _normalize_airport_code_series(df["airport_code"]),
+            country_code=lambda df: _normalize_country_code_series(df["country_code"]),
+        )
+        .dropna(subset=["airport_code"])
         .drop_duplicates()
     )
     print(f"Loaded airport mapping from {airports_path}")
@@ -130,7 +168,7 @@ def _load_destination_holidays_dataset() -> pd.DataFrame:
     if holidays_path is None:
         print(
             f"Warning: no destination holiday CSV found in {HOLIDAYS_FOLDER}. "
-            "Destination country holiday features will default to 0."
+            "Origin/destination holiday features will default to 0."
         )
         return pd.DataFrame(columns=["country_code", "type", "start_date", "end_date"])
 
@@ -143,7 +181,7 @@ def _load_destination_holidays_dataset() -> pd.DataFrame:
     if None in [country_column, type_column, start_column, end_column]:
         print(
             f"Warning: destination holidays CSV '{holidays_path.name}' does not contain expected columns. "
-            "Destination country holiday features will default to 0."
+            "Origin/destination holiday features will default to 0."
         )
         return pd.DataFrame(columns=["country_code", "type", "start_date", "end_date"])
 
@@ -155,8 +193,87 @@ def _load_destination_holidays_dataset() -> pd.DataFrame:
             end_column: "end_date",
         }
     )[["country_code", "type", "start_date", "end_date"]]
-    print(f"Loaded destination holidays from {holidays_path}")
+    print(f"Loaded holiday calendar from {holidays_path}")
     return holidays
+
+
+def _add_route_country_features(flights: pd.DataFrame, airports: pd.DataFrame) -> pd.DataFrame:
+    enriched = flights.copy()
+
+    if "AirportPrevious" not in enriched.columns:
+        enriched["AirportPrevious"] = pd.NA
+    if "AirportOrigin" not in enriched.columns:
+        enriched["AirportOrigin"] = pd.NA
+
+    enriched["AirportPrevious"] = _normalize_airport_code_series(enriched["AirportPrevious"])
+    enriched["AirportOrigin"] = _normalize_airport_code_series(enriched["AirportOrigin"])
+
+    previous_lookup = airports.rename(columns={"airport_code": "AirportPrevious", "country_code": "remote_country"})
+    origin_lookup = airports.rename(columns={"airport_code": "AirportOrigin", "country_code": "leg_country"})
+
+    enriched = enriched.merge(previous_lookup, on="AirportPrevious", how="left")
+    enriched = enriched.merge(origin_lookup, on="AirportOrigin", how="left")
+
+    if "Direction" in enriched.columns:
+        direction = enriched["Direction"].map(_normalize_direction_value)
+    else:
+        direction = pd.Series(pd.NA, index=enriched.index, dtype="object")
+
+    is_arrival = direction == "arrivee"
+    is_departure = direction == "depart"
+
+    enriched["origin_country"] = pd.Series(pd.NA, index=enriched.index, dtype="object")
+    enriched.loc[is_arrival, "origin_country"] = enriched.loc[is_arrival, "remote_country"]
+    enriched.loc[is_departure, "origin_country"] = LYON_COUNTRY_CODE
+
+    enriched["dest_country"] = pd.Series(pd.NA, index=enriched.index, dtype="object")
+    enriched.loc[is_arrival, "dest_country"] = LYON_COUNTRY_CODE
+    enriched.loc[is_departure, "dest_country"] = enriched.loc[is_departure, "remote_country"]
+
+    enriched["is_domestic"] = enriched["leg_country"].map(
+        lambda c: 1 if c == LYON_COUNTRY_CODE else (0 if pd.notna(c) else None)
+    )
+    enriched["is_route_domestic"] = enriched["remote_country"].map(
+        lambda c: 1 if c == LYON_COUNTRY_CODE else (0 if pd.notna(c) else None)
+    )
+
+    has_stopover = pd.Series(pd.NA, index=enriched.index, dtype="Int64")
+    stopover_mask = enriched["AirportPrevious"].notna() & enriched["AirportOrigin"].notna()
+    has_stopover.loc[stopover_mask] = (
+        enriched.loc[stopover_mask, "AirportPrevious"] != enriched.loc[stopover_mask, "AirportOrigin"]
+    ).astype("Int64")
+    enriched["has_stopover"] = has_stopover
+
+    return enriched
+
+
+def _add_country_holiday_features(
+    flights: pd.DataFrame,
+    public_holiday_days: pd.DataFrame,
+    school_holiday_days: pd.DataFrame,
+    *,
+    country_column: str,
+    public_column: str,
+    school_column: str,
+) -> pd.DataFrame:
+    enriched = flights.merge(
+        public_holiday_days.rename(columns={"country_code": country_column}).assign(**{public_column: 1}),
+        on=[country_column, "date"],
+        how="left",
+    )
+    enriched = enriched.merge(
+        school_holiday_days.rename(columns={"country_code": country_column}).assign(**{school_column: 1}),
+        on=[country_column, "date"],
+        how="left",
+    )
+
+    france_mask = enriched[country_column] == LYON_COUNTRY_CODE
+    enriched.loc[france_mask, public_column] = enriched.loc[france_mask, "is_fr_public_holiday"]
+    enriched.loc[france_mask, school_column] = enriched.loc[france_mask, "is_fr_school_holiday_zone_a"]
+
+    enriched[public_column] = enriched[public_column].fillna(0).astype(int)
+    enriched[school_column] = enriched[school_column].fillna(0).astype(int)
+    return enriched
 
 
 def _build_weather_datasets() -> pd.DataFrame:
@@ -323,15 +440,27 @@ def load_holiday_data() -> None:
     airports = _load_airports_dataset()
     holidays = _load_destination_holidays_dataset()
 
-    derived_columns = [
+    stale_columns = [
         "day_of_week",
         "is_weekend",
         "date",
         "date_only",
         "season",
+        "remote_country",
+        "leg_country",
+        "origin_country",
         "dest_country",
+        "is_domestic",
+        "is_route_domestic",
+        "has_stopover",
         "is_fr_public_holiday",
+        "is_bridge_day",
         "is_fr_school_holiday_zone_a",
+        "is_fr_school_holiday_zone_b",
+        "is_fr_school_holiday_zone_c",
+        "is_first_last_day_of_school_holiday",
+        "is_origin_public_holiday",
+        "is_origin_school_holiday",
         "is_dest_public_holiday",
         "is_dest_school_holiday",
         "is_any_day_off",
@@ -339,7 +468,7 @@ def load_holiday_data() -> None:
         "days_until_next_day_off",
         "days_until_next_workday",
     ]
-    flights = flights.drop(columns=[column for column in derived_columns if column in flights.columns])
+    flights = flights.drop(columns=[column for column in stale_columns if column in flights.columns])
 
     flights["LTScheduledDatetime"] = pd.to_datetime(flights["LTScheduledDatetime"], errors="coerce")
     flights["day_of_week"] = flights["LTScheduledDatetime"].dt.dayofweek
@@ -347,49 +476,13 @@ def load_holiday_data() -> None:
     flights["date"] = flights["LTScheduledDatetime"].dt.normalize()
     flights["date_only"] = flights["LTScheduledDatetime"].dt.date
 
-    def get_season(month):
-        if month in [12, 1, 2]:
-            return "winter"
-        elif month in [3, 4, 5]:
-            return "spring"
-        elif month in [6, 7, 8]:
-            return "summer"
-        else:
-            return "autumn"
-
-    flights["season"] = flights["LTScheduledDatetime"].dt.month.apply(get_season)
+    flights["season"] = flights["LTScheduledDatetime"].dt.month.apply(_get_season)
 
     # =========================
     # 3. MAPPING AIRPORT -> COUNTRY
     # =========================
 
-    # Drop columns that may already exist from a previous run to avoid _x/_y suffix conflicts
-    cols_to_reset = [
-        "dest_country",
-        "is_domestic",
-        "is_fr_public_holiday",
-        "is_bridge_day",
-        "is_fr_school_holiday_zone_a",
-        "is_fr_school_holiday_zone_b",
-        "is_fr_school_holiday_zone_c",
-        "is_fr_school_zone_b_and_c",
-        "is_first_last_day_of_school_holiday",
-        "is_dest_public_holiday",
-        "is_dest_school_holiday",
-    ]
-    flights = flights.drop(columns=[c for c in cols_to_reset if c in flights.columns])
-
-    # Load the airport lookup once and reuse for all mappings
-    airports_lookup = pd.read_csv(HOLIDAYS_FOLDER / "upply-airports.csv", sep=";")[["code", "country_code"]]
-
-    # Map AirportOrigin -> dest_country
-    # AirportOrigin uses IATA codes (3-letter) which match upply-airports.csv
-    airports_dest = airports_lookup.rename(columns={"code": "AirportOrigin", "country_code": "dest_country"})
-    airports_dest = airports_dest[["AirportOrigin", "dest_country"]].drop_duplicates()
-    flights = flights.merge(airports_dest, on="AirportOrigin", how="left")
-
-    # is_domestic: 1 if dest_country is France, 0 otherwise, None if dest_country is unknown
-    flights["is_domestic"] = flights["dest_country"].map(lambda c: 1 if c == "FR" else (0 if pd.notna(c) else None))
+    flights = _add_route_country_features(flights, airports)
 
     # =========================
     # 4. FRANCE : PUBLIC HOLIDAY
@@ -437,7 +530,7 @@ def load_holiday_data() -> None:
         fr_school_holidays_zone_c.update(year_holidays.keys())
     flights["is_fr_school_holiday_zone_c"] = flights["date_only"].isin(fr_school_holidays_zone_c).astype(int)
 
-    # is_fr_school_zone_b_and_c: 1 if the day is a school holiday in zone B or zone C
+    # Mark the first or last day of a contiguous school-holiday block across zones B and C.
     all_bc_holidays_ts = set(pd.to_datetime(list(fr_school_holidays_zone_b | fr_school_holidays_zone_c)))
     first_last_bc_ts = {
         d
@@ -449,11 +542,13 @@ def load_holiday_data() -> None:
     ).astype(int)
 
     # =========================
-    # 6. DESTINATION : HOLIDAYS
+    # 6. ORIGIN / DESTINATION : HOLIDAYS
     # =========================
 
     holidays = holidays.rename(columns={"country_iso_code": "country_code", "holiday_type": "type"})
 
+    holidays["country_code"] = _normalize_country_code_series(holidays["country_code"])
+    holidays["type"] = holidays["type"].astype("string").str.strip().str.lower()
     holidays["type"] = holidays["type"].replace({"public_holiday": "public", "school_holiday": "school"})
 
     holidays["start_date"] = pd.to_datetime(holidays["start_date"], errors="coerce")
@@ -469,24 +564,26 @@ def load_holiday_data() -> None:
 
     holiday_days = holidays.explode("date")[["country_code", "type", "date"]].drop_duplicates()
 
-    dest_public = (
-        holiday_days[holiday_days["type"] == "public"][["country_code", "date"]]
-        .rename(columns={"country_code": "dest_country"})
-        .drop_duplicates()
-        .assign(is_dest_public_holiday=1)
+    public_holiday_days = holiday_days[holiday_days["type"] == "public"][["country_code", "date"]].drop_duplicates()
+    school_holiday_days = holiday_days[holiday_days["type"] == "school"][["country_code", "date"]].drop_duplicates()
+
+    flights = _add_country_holiday_features(
+        flights,
+        public_holiday_days,
+        school_holiday_days,
+        country_column="origin_country",
+        public_column="is_origin_public_holiday",
+        school_column="is_origin_school_holiday",
     )
-    dest_school = (
-        holiday_days[holiday_days["type"] == "school"][["country_code", "date"]]
-        .rename(columns={"country_code": "dest_country"})
-        .drop_duplicates()
-        .assign(is_dest_school_holiday=1)
+    flights = _add_country_holiday_features(
+        flights,
+        public_holiday_days,
+        school_holiday_days,
+        country_column="dest_country",
+        public_column="is_dest_public_holiday",
+        school_column="is_dest_school_holiday",
     )
 
-    flights = flights.merge(dest_public, on=["dest_country", "date"], how="left")
-    flights = flights.merge(dest_school, on=["dest_country", "date"], how="left")
-
-    flights["is_dest_public_holiday"] = flights["is_dest_public_holiday"].fillna(0).astype(int)
-    flights["is_dest_school_holiday"] = flights["is_dest_school_holiday"].fillna(0).astype(int)
     flights = flights.drop(columns=["date", "date_only"], errors="ignore")
 
     flights.to_csv(MAIN_DATASET_FILE, index=False, encoding="utf-8-sig")
@@ -560,35 +657,40 @@ def add_day_off_countdown_features(flights: pd.DataFrame) -> pd.DataFrame:
     ]
     processed = processed.drop(columns=[column for column in stale_countdown_columns if column in processed.columns])
 
+    if "origin_country" not in processed.columns:
+        processed["origin_country"] = np.nan
     if "dest_country" not in processed.columns:
         processed["dest_country"] = np.nan
 
     processed["scheduled_date"] = processed["LTScheduledDatetime"].dt.normalize()
+    processed["origin_country"] = processed["origin_country"].fillna("__UNKNOWN__")
     processed["dest_country"] = processed["dest_country"].fillna("__UNKNOWN__")
 
     day_off_flags = processed[DAY_OFF_COLUMNS].fillna(0).astype(int)
     processed["is_any_day_off"] = day_off_flags.max(axis=1).astype(int)
 
     daily_calendar = (
-        processed[["dest_country", "scheduled_date", "is_any_day_off"]]
+        processed[["origin_country", "dest_country", "scheduled_date", "is_any_day_off"]]
         .dropna(subset=["scheduled_date"])
-        .groupby(["dest_country", "scheduled_date"], as_index=False)["is_any_day_off"]
+        .groupby(["origin_country", "dest_country", "scheduled_date"], as_index=False)["is_any_day_off"]
         .max()
-        .sort_values(["dest_country", "scheduled_date"])
+        .sort_values(["origin_country", "dest_country", "scheduled_date"])
         .reset_index(drop=True)
     )
 
     countdown_frames = [
-        compute_group_day_off_countdowns(group) for _, group in daily_calendar.groupby("dest_country", sort=False)
+        compute_group_day_off_countdowns(group)
+        for _, group in daily_calendar.groupby(["origin_country", "dest_country"], sort=False)
     ]
 
     if countdown_frames:
         countdowns = pd.concat(countdown_frames, ignore_index=True)
-        processed = processed.merge(countdowns, on=["dest_country", "scheduled_date"], how="left")
+        processed = processed.merge(countdowns, on=["origin_country", "dest_country", "scheduled_date"], how="left")
     else:
         processed["days_until_next_day_off"] = np.nan
         processed["days_until_next_workday"] = np.nan
 
+    processed["origin_country"] = processed["origin_country"].replace("__UNKNOWN__", np.nan)
     processed["dest_country"] = processed["dest_country"].replace("__UNKNOWN__", np.nan)
     return processed
 
@@ -625,7 +727,9 @@ def compute_group_day_off_countdowns(group: pd.DataFrame) -> pd.DataFrame:
 
     group["days_until_next_day_off"] = days_until_next_day_off
     group["days_until_next_workday"] = days_until_next_workday
-    return group[["dest_country", "scheduled_date", "days_until_next_day_off", "days_until_next_workday"]]
+    return group[
+        ["origin_country", "dest_country", "scheduled_date", "days_until_next_day_off", "days_until_next_workday"]
+    ]
 
 
 # --- Configuration et exécution du script ---
@@ -643,11 +747,7 @@ if __name__ == "__main__":
 
     ORIGINAL_DATASET_FILE = DATA_FOLDER / "original_dataset.csv"
     MAIN_DATASET_FILE = DATA_FOLDER / "main_dataset.csv"
-    ENRICHED_DATASET_FILE = DATA_FOLDER / "enriched_dataset.csv"
     WEATHER_FILE = WEATHER_FOLDER / "weather.csv"
-
-    if input("This operation is about to delete and redownload the entire dataset. Proceed? (Y/N): ").lower() != "y":
-        quit()
 
     # load_main_dataset()
     merge_datasets()
