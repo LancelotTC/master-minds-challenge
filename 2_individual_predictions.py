@@ -11,7 +11,6 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.metrics import mean_absolute_error, r2_score
-from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
@@ -26,6 +25,7 @@ from movement_model_utils import (
     PREDICTION_MODE_KNOWN_TARGET,
     plot_prediction_results,
     run_progress_step,
+    split_train_validation_by_date,
     write_predictions,
 )
 
@@ -56,11 +56,9 @@ def get_predictions(model, features, target, prediction_features, step_progress=
         ]
     )
 
-    X_train, X_val, y_train, y_val = train_test_split(
+    X_train, X_val, y_train, y_val = split_train_validation_by_date(
         features,
         target,
-        test_size=0.2,
-        random_state=42,
     )
 
     run_progress_step(step_progress, "fit", pipeline.fit, X_train, y_train)
@@ -74,7 +72,7 @@ def get_predictions(model, features, target, prediction_features, step_progress=
     )
 
 
-@track_emissions()
+# @track_emissions()
 def main():
     training_features, training_target, prediction_features, prediction_ids = load_training_and_prediction_frames(
         prediction_mode=PREDICTION_MODE
@@ -86,14 +84,14 @@ def main():
     if "XGBRegressor" in results:
         regressors["XGBRegressor"] = XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"]))
 
-    if "LGBMRegressor" in results:
-        regressors["LGBMRegressor"] = LGBMRegressor(
-            random_state=42,
-            objective="mae",
-            verbosity=-1,
-            force_col_wise=True,
-            **clean_model_params(results["LGBMRegressor"]["best_params"]),
-        )
+    # if "LGBMRegressor" in results:
+    #     regressors["LGBMRegressor"] = LGBMRegressor(
+    #         random_state=42,
+    #         objective="mae",
+    #         verbosity=-1,
+    #         force_col_wise=True,
+    #         **clean_model_params(results["LGBMRegressor"]["best_params"]),
+    #     )
 
     # if "DecisionTreeRegressor" in results:
     #     regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
@@ -125,10 +123,10 @@ def main():
     #     regressors["GradientBoostingRegressor"] = GradientBoostingRegressor(
     #         **clean_model_params(results["GradientBoostingRegressor"]["best_params"])
     #     )
-    if "HistGradientBoostingRegressor" in results:
-        regressors["HistGradientBoostingRegressor"] = HistGradientBoostingRegressor(
-            **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
-        )
+    # if "HistGradientBoostingRegressor" in results:
+    #     regressors["HistGradientBoostingRegressor"] = HistGradientBoostingRegressor(
+    #         **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
+    #     )
 
     if not regressors:
         raise RuntimeError("No enabled regressors found in hyperparameters.json.")

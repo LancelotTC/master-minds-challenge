@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "description": "Edit this file to add/remove features, filter rows, or override predictions without changing Python code.",
+  "add_feature_columns": [],
+  "remove_feature_columns": [],
+  "add_categorical_feature_columns": [],
+  "remove_categorical_feature_columns": [],
+  "row_filters": [],
+  "prediction_overrides": []
+}
