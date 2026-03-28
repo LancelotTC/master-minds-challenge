@@ -19,6 +19,8 @@
     // "dest_country",
     "is_fr_public_holiday",
     "is_fr_school_holiday_zone_a",
+    "is_fr_school_holiday_zone_b",
+    "is_fr_school_holiday_zone_c",
     "is_dest_public_holiday",
     "is_dest_school_holiday",
     // "precipitation_sum",
@@ -36,7 +38,9 @@
     "is_any_day_off",
     "days_until_next_day_off",
     "days_until_next_workday",
-    "LTCancellationDatetime"
+    // "is_domestic",
+    // "is_bridge_day",
+    "is_first_last_day_of_school_holiday"
   ],
   "categorical_feature_columns": [
     "IdAircraftType",
@@ -46,8 +50,19 @@
     "FlightNumberNormalized",
     "Direction",
     "SysTerminal",
-    "season"
-    // ,"dest_country"
+    "season",
+    "is_any_day_off",
+    // "is_domestic",
+    // "is_bridge_day",
+    "is_first_last_day_of_school_holiday",
+    "is_weekend",
+    "is_fr_public_holiday",
+    "is_fr_school_holiday_zone_a",
+    "is_fr_school_holiday_zone_b",
+    "is_fr_school_holiday_zone_c",
+    "is_dest_public_holiday",
+    "is_dest_school_holiday"
+    // "dest_country"
   ],
   "row_filters": [],
   "prediction_overrides": []

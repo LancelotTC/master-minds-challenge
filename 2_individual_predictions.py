@@ -25,6 +25,7 @@ from movement_model_utils import (
     PREDICTION_MODE_KNOWN_TARGET,
     plot_prediction_results,
     run_progress_step,
+    sort_features_and_target_by_datetime,
     split_train_validation_by_date,
     write_predictions,
 )
@@ -48,18 +49,29 @@ def params_without(params: dict[str, object], *excluded_keys: str) -> dict[str, 
     return {key: value for key, value in params.items() if key not in excluded}
 
 
-def get_predictions(model, features, target, prediction_features, step_progress=None):
-    pipeline = Pipeline(
+def build_prediction_pipeline(model, features):
+    return Pipeline(
         [
             ("preprocess", make_preprocessor(features)),
             ("model", model),
         ]
     )
 
-    X_train, X_val, y_train, y_val = split_train_validation_by_date(
+
+def split_training_data_by_datetime(features, target):
+    ordered_features, ordered_target = sort_features_and_target_by_datetime(features, target)
+    return split_train_validation_by_date(
+        ordered_features,
+        ordered_target,
+    )
+
+
+def get_predictions_from_datetime_split(model, features, target, prediction_features, step_progress=None):
+    X_train, X_val, y_train, y_val = split_training_data_by_datetime(
         features,
         target,
     )
+    pipeline = build_prediction_pipeline(model, X_train)
 
     run_progress_step(step_progress, "fit", pipeline.fit, X_train, y_train)
     validation_predictions = run_progress_step(step_progress, "val_predict", pipeline.predict, X_val)
@@ -72,17 +84,12 @@ def get_predictions(model, features, target, prediction_features, step_progress=
     )
 
 
-# @track_emissions()
-def main():
-    training_features, training_target, prediction_features, prediction_ids = load_training_and_prediction_frames(
-        prediction_mode=PREDICTION_MODE
-    )
-    results = load_hyperparameter_results()
-
+def build_enabled_regressors(results: dict[str, dict[str, object]]) -> dict[str, object]:
     regressors = {}
 
     if "XGBRegressor" in results:
-        regressors["XGBRegressor"] = XGBRegressor(**clean_model_params(results["XGBRegressor"]["best_params"]))
+        best_params = clean_model_params(results["XGBRegressor"]["best_params"])
+        regressors["XGBRegressor"] = XGBRegressor(**best_params)
 
     # if "LGBMRegressor" in results:
     #     regressors["LGBMRegressor"] = LGBMRegressor(
@@ -128,12 +135,23 @@ def main():
     #         **clean_model_params(results["HistGradientBoostingRegressor"]["best_params"])
     #     )
 
+    return regressors
+
+
+@track_emissions()
+def main():
+    training_features, training_target, prediction_features, prediction_ids = load_training_and_prediction_frames(
+        prediction_mode=PREDICTION_MODE
+    )
+    results = load_hyperparameter_results()
+    regressors = build_enabled_regressors(results)
+
     if not regressors:
         raise RuntimeError("No enabled regressors found in hyperparameters.json.")
 
     for name, model in tqdm(regressors.items(), total=len(regressors), desc="Regressors", unit="model"):
         with tqdm(total=5, desc=f"{name}", unit="step", leave=False) as step_progress:
-            predictions, validation_r2, validation_mae = get_predictions(
+            predictions, validation_r2, validation_mae = get_predictions_from_datetime_split(
                 model,
                 training_features,
                 training_target,
