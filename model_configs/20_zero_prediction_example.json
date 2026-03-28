@@ -10,23 +10,6 @@
         "operator": "eq",
         "value": 0
       }
-    },
-    {
-      "name": "force_zero_pax_when_business_unit_type_is_not_1",
-      "set_prediction": 0,
-      "when": {
-        "column": "IdBusinessUnitType",
-        "operator": "ne",
-        "value": 1
-      }
-    },
-    {
-      "name": "force_zero_pax_when_cancellation_info_is_given",
-      "set_prediction": 0,
-      "when": {
-        "column": "LTCancellationDatetime",
-        "operator": "not_null"
-      }
     }
   ]
 }

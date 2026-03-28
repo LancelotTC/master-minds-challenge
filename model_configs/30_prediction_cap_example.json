@@ -1,5 +1,5 @@
 {
-  "enabled": false,
+  "enabled": true,
   "description": "Example only. Set enabled to true to ensure NbPaxTotalPrediction never exceeds NbOfSeats.",
   "prediction_overrides": [
     {

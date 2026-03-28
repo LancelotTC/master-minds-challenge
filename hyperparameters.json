@@ -15,18 +15,18 @@
         "training_rows": 100000
     },
     "XGBRegressor": {
-        "best_score": -14.047852218479445,
+        "best_score": -20.5988,
         "best_params": {
-            "colsample_bytree": 0.751917582350009,
+            "colsample_bytree": 0.6,
             "eval_metric": "mae",
-            "gamma": 0.46706662881178257,
-            "learning_rate": 0.0543176008376669,
+            "gamma": 2.0,
+            "learning_rate": 0.01929710475765338,
             "max_depth": 13,
-            "min_child_weight": 19,
+            "min_child_weight": 51,
             "n_estimators": 1623,
             "objective": "reg:absoluteerror",
             "reg_lambda": 0.1,
-            "subsample": 0.9099503178161161,
+            "subsample": 1.0,
             "tree_method": "hist"
         },
         "training_rows": 100000
