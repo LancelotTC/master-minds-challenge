@@ -219,8 +219,8 @@ def _add_route_country_features(flights: pd.DataFrame, airports: pd.DataFrame) -
     else:
         direction = pd.Series(pd.NA, index=enriched.index, dtype="object")
 
-    is_arrival = direction == "arrivee"
-    is_departure = direction == "depart"
+    is_arrival = direction.eq("arrivee").fillna(False)
+    is_departure = direction.eq("depart").fillna(False)
 
     enriched["origin_country"] = pd.Series(pd.NA, index=enriched.index, dtype="object")
     enriched.loc[is_arrival, "origin_country"] = enriched.loc[is_arrival, "remote_country"]
@@ -230,12 +230,19 @@ def _add_route_country_features(flights: pd.DataFrame, airports: pd.DataFrame) -
     enriched.loc[is_arrival, "dest_country"] = LYON_COUNTRY_CODE
     enriched.loc[is_departure, "dest_country"] = enriched.loc[is_departure, "remote_country"]
 
-    enriched["is_domestic"] = enriched["leg_country"].map(
-        lambda c: 1 if c == LYON_COUNTRY_CODE else (0 if pd.notna(c) else None)
+    is_domestic = pd.Series(pd.NA, index=enriched.index, dtype="Int64")
+    known_leg_country = enriched["leg_country"].notna()
+    is_domestic.loc[known_leg_country] = (
+        enriched.loc[known_leg_country, "leg_country"].eq(LYON_COUNTRY_CODE).astype("Int64")
     )
-    enriched["is_route_domestic"] = enriched["remote_country"].map(
-        lambda c: 1 if c == LYON_COUNTRY_CODE else (0 if pd.notna(c) else None)
+    enriched["is_domestic"] = is_domestic
+
+    is_route_domestic = pd.Series(pd.NA, index=enriched.index, dtype="Int64")
+    known_remote_country = enriched["remote_country"].notna()
+    is_route_domestic.loc[known_remote_country] = (
+        enriched.loc[known_remote_country, "remote_country"].eq(LYON_COUNTRY_CODE).astype("Int64")
     )
+    enriched["is_route_domestic"] = is_route_domestic
 
     has_stopover = pd.Series(pd.NA, index=enriched.index, dtype="Int64")
     stopover_mask = enriched["AirportPrevious"].notna() & enriched["AirportOrigin"].notna()
@@ -267,7 +274,7 @@ def _add_country_holiday_features(
         how="left",
     )
 
-    france_mask = enriched[country_column] == LYON_COUNTRY_CODE
+    france_mask = enriched[country_column].eq(LYON_COUNTRY_CODE).fillna(False)
     enriched.loc[france_mask, public_column] = enriched.loc[france_mask, "is_fr_public_holiday"]
     enriched.loc[france_mask, school_column] = enriched.loc[france_mask, "is_fr_school_holiday_zone_a"]
 
@@ -735,19 +742,7 @@ def compute_group_day_off_countdowns(group: pd.DataFrame) -> pd.DataFrame:
 # --- Configuration et exécution du script ---
 if __name__ == "__main__":
     load_dotenv()
-
-    DATA_FOLDER = Path("data/")
-    DATA_FOLDER.mkdir(exist_ok=True)
-
-    WEATHER_FOLDER = DATA_FOLDER / "weather"
-    WEATHER_FOLDER.mkdir(exist_ok=True)
-
-    HOLIDAYS_FOLDER = DATA_FOLDER / "holidays"
-    HOLIDAYS_FOLDER.mkdir(exist_ok=True)
-
-    ORIGINAL_DATASET_FILE = DATA_FOLDER / "original_dataset.csv"
-    MAIN_DATASET_FILE = DATA_FOLDER / "main_dataset.csv"
-    WEATHER_FILE = WEATHER_FOLDER / "weather.csv"
+    ensure_data_directories()
 
     # load_main_dataset()
     merge_datasets()
