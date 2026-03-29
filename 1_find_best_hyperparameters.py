@@ -28,11 +28,9 @@ from movement_model_utils import (
 
 RANDOM_SEED = 42
 TRAINING_DATASET_SIZE = 311_572
-TRAINING_DATASET_SUBSAMPLE_SEED = RANDOM_SEED
 SEARCH_ITERATIONS = 100
 CV_FOLDS = 5
-# -1 for all CPUs. For each job, a copy of the dataset is put in memory. Check number of cores and memory capacity.
-JOBS = os.cpu_count() - 1
+# Use all CPUs. Each parallel job keeps its own data copy in memory.
 JOBS = -1
 RESULTS_FILENAME = "hyperparameters.json"
 RESULTS_PATH = Path(__file__).resolve().parent / RESULTS_FILENAME

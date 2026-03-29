@@ -45,16 +45,21 @@ BASE_FEATURE_COLUMNS = [
     "day_of_week",
     "is_weekend",
     "season",
+    "origin_country",
     "dest_country",
+    "is_domestic",
+    "is_route_domestic",
+    "has_stopover",
     "is_fr_public_holiday",
     "is_bridge_day",
     "is_fr_school_holiday_zone_a",
     "is_fr_school_holiday_zone_b",
     "is_fr_school_holiday_zone_c",
     "is_first_last_day_of_school_holiday",
+    "is_origin_public_holiday",
+    "is_origin_school_holiday",
     "is_dest_public_holiday",
     "is_dest_school_holiday",
-    "is_domestic",
     "precipitation_sum",
     "rain_sum",
     "snowfall_sum",
@@ -89,14 +94,27 @@ CATEGORICAL_FEATURE_COLUMNS = {
     "Direction",
     "SysTerminal",
     "season",
+    "origin_country",
     "dest_country",
+    "day_of_week",
+    "is_weekend",
+    "is_domestic",
+    "is_route_domestic",
+    "has_stopover",
+    "is_fr_public_holiday",
+    "is_bridge_day",
+    "is_fr_school_holiday_zone_a",
+    "is_fr_school_holiday_zone_b",
+    "is_fr_school_holiday_zone_c",
+    "is_first_last_day_of_school_holiday",
+    "is_origin_public_holiday",
+    "is_origin_school_holiday",
+    "is_dest_public_holiday",
+    "is_dest_school_holiday",
+    "is_any_day_off",
 }
 
 NUMERIC_FEATURE_COLUMNS = set(FEATURE_COLUMNS) - CATEGORICAL_FEATURE_COLUMNS
-# New binary features are numeric (0/1/NaN)
-# is_bridge_day, is_fr_school_holiday_zone_b, is_fr_school_holiday_zone_c,
-# is_first_last_day_of_school_holiday, is_domestic, is_departure
-# → all already included in NUMERIC_FEATURE_COLUMNS via the set difference above
 REQUIRED_COLUMNS = [ID_COLUMN, TARGET_COLUMN, *FEATURE_COLUMNS]
 ProgressResult = TypeVar("ProgressResult")
 
@@ -549,7 +567,7 @@ def sort_features_and_target_by_datetime(
 def split_train_validation_by_date(
     features: pd.DataFrame,
     target: pd.Series,
-    validation_fraction: float = 0.2,
+    validation_fraction: float = 0.05,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     if not 0 < validation_fraction < 1:
         raise ValueError("validation_fraction must be between 0 and 1.")
@@ -798,20 +816,6 @@ def print_dataset_debug_summary(
     complete_feature_mask: pd.Series,
 ) -> None:
     return
-    total_rows = len(raw_dataframe)
-    complete_rows = int(complete_feature_mask.sum())
-    incomplete_rows = total_rows - complete_rows
-    target_present_rows = int(target.notna().sum())
-    prediction_candidate_rows = int(target.isna().sum())
-
-    print(
-        "Dataset debug:"
-        f" total_rows={total_rows}"
-        f" complete_feature_rows={complete_rows}"
-        f" discarded_for_missing_features={incomplete_rows}"
-        f" target_present_rows={target_present_rows}"
-        f" target_missing_rows={prediction_candidate_rows}"
-    )
 
 
 def print_discarded_rows_debug(
@@ -820,22 +824,6 @@ def print_discarded_rows_debug(
     discarded_feature_mask: pd.Series,
 ) -> None:
     return
-    runtime_config = load_model_runtime_config()
-    discarded_features = feature_dataframe.loc[discarded_feature_mask, list(runtime_config.feature_columns)]
-    discarded_raw_rows = raw_dataframe.loc[discarded_feature_mask]
-
-    print("\nDiscarded rows because at least one kept feature is null:")
-    for row_index in discarded_features.index:
-        missing_columns = discarded_features.columns[discarded_features.loc[row_index].isna()].tolist()
-        row_number = discarded_raw_rows.at[row_index, ROW_ID_COLUMN]
-        movement_id = discarded_raw_rows.at[row_index, ID_COLUMN] if ID_COLUMN in discarded_raw_rows.columns else "N/A"
-        target_value = discarded_raw_rows.at[row_index, TARGET_COLUMN]
-        print(
-            f"row_number={row_number} "
-            f"IdMovement={movement_id} "
-            f"{TARGET_COLUMN}={target_value} "
-            f"missing_features={missing_columns}"
-        )
 
 
 def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:

@@ -1,7 +1,8 @@
 {
   "enabled": true,
-  "description": "Base feature set used by the models unless another config adds/removes columns.",
+  "description": "Base feature set used by the models unless another config adds or removes columns.",
   "feature_columns": [
+    // Base flight columns
     "IdAircraftType",
     "IdBusinessUnitType",
     "IdBusContactType",
@@ -13,20 +14,36 @@
     "Direction",
     "SysTerminal",
     "NbOfSeats",
+
+    // Calendar and route features generated in update_datasets.py
     "day_of_week",
     "is_weekend",
     "season",
-    // "dest_country",
+    "origin_country",
+    "dest_country",
+    "is_domestic",
+    "is_route_domestic",
+    "has_stopover",
+
+    // Holiday features generated in update_datasets.py
     "is_fr_public_holiday",
+    "is_bridge_day",
     "is_fr_school_holiday_zone_a",
     "is_fr_school_holiday_zone_b",
     "is_fr_school_holiday_zone_c",
+    "is_first_last_day_of_school_holiday",
+    "is_origin_public_holiday",
+    "is_origin_school_holiday",
     "is_dest_public_holiday",
     "is_dest_school_holiday",
-    // "precipitation_sum",
-    // "rain_sum",
-    // "snowfall_sum",
-    // "windspeed_10m_max",
+
+    // Weather features generated in update_datasets.py
+    "precipitation_sum",
+    "rain_sum",
+    "snowfall_sum",
+    "windspeed_10m_max",
+
+    // Engineered datetime and countdown features
     "month_of_year",
     "hour_of_day",
     "hour_sin",
@@ -37,10 +54,7 @@
     "month_cos",
     "is_any_day_off",
     "days_until_next_day_off",
-    "days_until_next_workday",
-    // "is_domestic",
-    // "is_bridge_day",
-    "is_first_last_day_of_school_holiday"
+    "days_until_next_workday"
   ],
   "categorical_feature_columns": [
     "IdAircraftType",
@@ -51,18 +65,24 @@
     "Direction",
     "SysTerminal",
     "season",
-    "is_any_day_off",
-    // "is_domestic",
-    // "is_bridge_day",
-    "is_first_last_day_of_school_holiday",
+    "origin_country",
+    "dest_country",
+    "day_of_week",
     "is_weekend",
+    "is_domestic",
+    "is_route_domestic",
+    "has_stopover",
     "is_fr_public_holiday",
+    "is_bridge_day",
     "is_fr_school_holiday_zone_a",
     "is_fr_school_holiday_zone_b",
     "is_fr_school_holiday_zone_c",
+    "is_first_last_day_of_school_holiday",
+    "is_origin_public_holiday",
+    "is_origin_school_holiday",
     "is_dest_public_holiday",
-    "is_dest_school_holiday"
-    // "dest_country"
+    "is_dest_school_holiday",
+    "is_any_day_off"
   ],
   "row_filters": [],
   "prediction_overrides": []
