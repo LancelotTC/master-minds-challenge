@@ -6,8 +6,10 @@ python-dotenv
 
 # Data
 matplotlib
+seaborn
 pandas
 numpy
+scipy
 jours_feries_france
 vacances_scolaires_france
 
