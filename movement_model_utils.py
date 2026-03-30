@@ -451,9 +451,7 @@ def apply_prediction_overrides(
         if "set_prediction_from_column" in rule:
             column_name = str(rule["set_prediction_from_column"])
             if column_name not in context_dataframe.columns:
-                raise RuntimeError(
-                    f"Prediction override '{rule_name}' references unknown column '{column_name}'."
-                )
+                raise RuntimeError(f"Prediction override '{rule_name}' references unknown column '{column_name}'.")
             column_values = pd.to_numeric(context_dataframe[column_name], errors="coerce").to_numpy(dtype=float)
             valid_mask = rule_mask & np.isfinite(column_values)
             adjusted_predictions[valid_mask] = column_values[valid_mask]
@@ -463,9 +461,7 @@ def apply_prediction_overrides(
         if "clip_upper_column" in rule:
             column_name = str(rule["clip_upper_column"])
             if column_name not in context_dataframe.columns:
-                raise RuntimeError(
-                    f"Prediction override '{rule_name}' references unknown column '{column_name}'."
-                )
+                raise RuntimeError(f"Prediction override '{rule_name}' references unknown column '{column_name}'.")
             column_values = pd.to_numeric(context_dataframe[column_name], errors="coerce").to_numpy(dtype=float)
             valid_mask = rule_mask & np.isfinite(column_values)
             adjusted_predictions[valid_mask] = np.minimum(
@@ -478,9 +474,7 @@ def apply_prediction_overrides(
         if "clip_lower_column" in rule:
             column_name = str(rule["clip_lower_column"])
             if column_name not in context_dataframe.columns:
-                raise RuntimeError(
-                    f"Prediction override '{rule_name}' references unknown column '{column_name}'."
-                )
+                raise RuntimeError(f"Prediction override '{rule_name}' references unknown column '{column_name}'.")
             column_values = pd.to_numeric(context_dataframe[column_name], errors="coerce").to_numpy(dtype=float)
             valid_mask = rule_mask & np.isfinite(column_values)
             adjusted_predictions[valid_mask] = np.maximum(
@@ -605,9 +599,7 @@ def build_datewise_cv_splits(
     scheduled_dates = get_feature_datetimes(features).dt.normalize()
     unique_dates = pd.Index(scheduled_dates.dropna().unique()).sort_values()
     if len(unique_dates) < 2:
-        raise RuntimeError(
-            "Date-based CV requires at least two distinct scheduled dates."
-        )
+        raise RuntimeError("Date-based CV requires at least two distinct scheduled dates.")
 
     splits: list[tuple[np.ndarray, np.ndarray]] = []
     effective_splits = min(n_splits, len(unique_dates) - 1)
@@ -663,7 +655,9 @@ def load_main_dataset_dataframe(
         low_memory=False,
     )
 
-    missing_columns = [column_name for column_name in runtime_config.required_columns if column_name not in dataframe.columns]
+    missing_columns = [
+        column_name for column_name in runtime_config.required_columns if column_name not in dataframe.columns
+    ]
     if missing_columns:
         raise RuntimeError(f"Missing required columns in {dataset_path}: {missing_columns}")
 
@@ -748,7 +742,7 @@ def load_training_and_prediction_frames(
     training_target = target.loc[training_mask].astype(float)
 
     prediction_identifier_columns = _deduplicate_preserve_order(
-        [ROW_ID_COLUMN, ID_COLUMN, *runtime_config.prediction_override_columns]
+        [ROW_ID_COLUMN, ID_COLUMN, "LTScheduledDatetime", *runtime_config.prediction_override_columns]
     )
     if prediction_mode == PREDICTION_MODE_KNOWN_TARGET:
         prediction_mask = training_mask
@@ -869,7 +863,9 @@ def write_predictions(
         runtime_config.prediction_overrides,
     )
     clipped_predictions = np.clip(np.rint(np.asarray(adjusted_predictions)), 0, None).astype(int)
-    output_columns = [column_name for column_name in [ROW_ID_COLUMN, ID_COLUMN, TARGET_COLUMN] if column_name in output.columns]
+    output_columns = [
+        column_name for column_name in [ROW_ID_COLUMN, ID_COLUMN, "LTScheduledDatetime", TARGET_COLUMN] if column_name in output.columns
+    ]
     output = output[output_columns].copy()
     output[PREDICTION_COLUMN] = clipped_predictions
 
