@@ -573,26 +573,19 @@ def split_train_validation_by_date(
         raise ValueError("validation_fraction must be between 0 and 1.")
 
     sorted_features, sorted_target = sort_features_and_target_by_datetime(features, target)
-    scheduled_dates = get_feature_datetimes(sorted_features).dt.normalize()
-    unique_dates = pd.Index(scheduled_dates.dropna().unique()).sort_values()
+    total_rows = len(sorted_features)
+    if total_rows < 2:
+        raise RuntimeError("Chronological validation split requires at least two rows.")
 
-    if len(unique_dates) < 2:
-        raise RuntimeError("Date-based validation split requires at least two distinct scheduled dates.")
+    validation_row_count = max(1, int(np.ceil(total_rows * validation_fraction)))
+    training_row_count = total_rows - validation_row_count
+    if training_row_count < 1:
+        training_row_count = total_rows - 1
+        validation_row_count = 1
 
-    validation_date_count = max(1, int(np.ceil(len(unique_dates) * validation_fraction)))
-    training_date_count = len(unique_dates) - validation_date_count
-    if training_date_count < 1:
-        training_date_count = len(unique_dates) - 1
-        validation_date_count = 1
-
-    training_dates = set(unique_dates[:training_date_count].tolist())
-    validation_dates = set(unique_dates[training_date_count:].tolist())
-
-    training_mask = scheduled_dates.isin(training_dates) | scheduled_dates.isna()
-    validation_mask = scheduled_dates.isin(validation_dates)
-
-    if not validation_mask.any():
-        raise RuntimeError("Date-based validation split produced an empty validation set.")
+    training_mask = np.zeros(total_rows, dtype=bool)
+    training_mask[:training_row_count] = True
+    validation_mask = ~training_mask
 
     return (
         sorted_features.loc[training_mask].copy(),
@@ -918,13 +911,19 @@ def plot_prediction_results(
     full_plot_data = plot_data.copy()
     actual_full = full_plot_data[TARGET_COLUMN].to_numpy(dtype=float)
     predicted_full = full_plot_data[PREDICTION_COLUMN].to_numpy(dtype=float)
+    residual_full = predicted_full - actual_full
     absolute_errors = np.abs(predicted_full - actual_full)
+    squared_errors = np.square(residual_full)
     mean_absolute_deviation = float(np.mean(absolute_errors))
     median_absolute_deviation = float(np.median(absolute_errors))
+    root_mean_squared_error = float(np.sqrt(np.mean(squared_errors)))
     actual_mean = float(np.mean(actual_full))
+    actual_standard_deviation = float(np.std(actual_full))
     actual_median = float(np.median(actual_full))
     predicted_mean = float(np.mean(predicted_full))
+    predicted_standard_deviation = float(np.std(predicted_full))
     predicted_median = float(np.median(predicted_full))
+    residual_standard_deviation = float(np.std(residual_full))
 
     if max_points > 0 and len(plot_data) > max_points:
         plot_data = plot_data.sample(n=max_points, random_state=42)
@@ -983,9 +982,25 @@ def plot_prediction_results(
 
     stats_text = "\n".join(
         [
-            f"MAE / MedAE: {mean_absolute_deviation:,.2f} / {median_absolute_deviation:,.2f}",
-            f"Actual mean / med: {actual_mean:,.2f} / {actual_median:,.2f}",
-            f"Pred mean / med: {predicted_mean:,.2f} / {predicted_median:,.2f}",
+            (
+                "MAE / MedAE / RMSE / Residual std: "
+                f"{mean_absolute_deviation:,.2f} / "
+                f"{median_absolute_deviation:,.2f} / "
+                f"{root_mean_squared_error:,.2f} / "
+                f"{residual_standard_deviation:,.2f}"
+            ),
+            (
+                "Actual mean / std / med: "
+                f"{actual_mean:,.2f} / "
+                f"{actual_standard_deviation:,.2f} / "
+                f"{actual_median:,.2f}"
+            ),
+            (
+                "Pred mean / std / med: "
+                f"{predicted_mean:,.2f} / "
+                f"{predicted_standard_deviation:,.2f} / "
+                f"{predicted_median:,.2f}"
+            ),
         ]
     )
     figure.text(
