@@ -4,7 +4,9 @@ from movement_model_utils import regenerate_prediction_plots
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Regenerate prediction plots from saved *_preds.csv files.")
+    parser = argparse.ArgumentParser(
+        description="Regenerate prediction plots from saved validation prediction CSV files."
+    )
     parser.add_argument(
         "--predictions-dir",
         default="predictions",
@@ -12,8 +14,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--pattern",
-        default="*_preds.csv",
-        help="Glob pattern used to find prediction CSV files recursively.",
+        default="*_validation_preds.csv",
+        help="Glob pattern used to find validation prediction CSV files recursively.",
     )
     parser.add_argument(
         "--show",

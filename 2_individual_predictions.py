@@ -79,6 +79,8 @@ def get_predictions_from_datetime_split(model, features, target, prediction_feat
 
     return (
         prediction_rows,
+        X_val.index,
+        validation_predictions,
         r2_score(y_val, validation_predictions),
         mean_absolute_error(y_val, validation_predictions),
     )
@@ -87,18 +89,18 @@ def get_predictions_from_datetime_split(model, features, target, prediction_feat
 def build_enabled_regressors(results: dict[str, dict[str, object]]) -> dict[str, object]:
     regressors = {}
 
-    if "XGBRegressor" in results:
-        best_params = clean_model_params(results["XGBRegressor"]["best_params"])
-        regressors["XGBRegressor"] = XGBRegressor(**best_params)
+    # if "XGBRegressor" in results:
+    #     best_params = clean_model_params(results["XGBRegressor"]["best_params"])
+    #     regressors["XGBRegressor"] = XGBRegressor(**best_params)
 
-    # if "LGBMRegressor" in results:
-    #     regressors["LGBMRegressor"] = LGBMRegressor(
-    #         random_state=42,
-    #         objective="mae",
-    #         verbosity=-1,
-    #         force_col_wise=True,
-    #         **clean_model_params(results["LGBMRegressor"]["best_params"]),
-    #     )
+    if "LGBMRegressor" in results:
+        regressors["LGBMRegressor"] = LGBMRegressor(
+            random_state=42,
+            objective="mae",
+            verbosity=-1,
+            force_col_wise=True,
+            **clean_model_params(results["LGBMRegressor"]["best_params"]),
+        )
 
     # if "DecisionTreeRegressor" in results:
     #     regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
@@ -150,13 +152,15 @@ def main():
         raise RuntimeError("No enabled regressors found in hyperparameters.json.")
 
     for name, model in tqdm(regressors.items(), total=len(regressors), desc="Regressors", unit="model"):
-        with tqdm(total=5, desc=f"{name}", unit="step", leave=False) as step_progress:
-            predictions, validation_r2, validation_mae = get_predictions_from_datetime_split(
-                model,
-                training_features,
-                training_target,
-                prediction_features,
-                step_progress=step_progress,
+        with tqdm(total=6, desc=f"{name}", unit="step", leave=False) as step_progress:
+            predictions, validation_indices, validation_predictions, validation_r2, validation_mae = (
+                get_predictions_from_datetime_split(
+                    model,
+                    training_features,
+                    training_target,
+                    prediction_features,
+                    step_progress=step_progress,
+                )
             )
 
             output_path = run_progress_step(
@@ -167,7 +171,15 @@ def main():
                 prediction_ids,
                 f"{name}_preds",
             )
-            run_progress_step(step_progress, "plot", plot_prediction_results, output_path)
+            validation_output_path = run_progress_step(
+                step_progress,
+                "write_val_csv",
+                write_predictions,
+                validation_predictions,
+                prediction_ids.loc[validation_indices],
+                f"{name}_validation_preds",
+            )
+            run_progress_step(step_progress, "plot", plot_prediction_results, validation_output_path)
 
         print(
             ColorString(
@@ -176,6 +188,9 @@ def main():
             )
         )
         print(f"Predictions written to {output_path}")
+        print(
+            f"Validation predictions and validation-only plot source written to {validation_output_path}"
+        )
 
 
 if __name__ == "__main__":

@@ -1029,7 +1029,7 @@ def plot_prediction_results(
 
 def regenerate_prediction_plots(
     predictions_root: str | Path = PREDICTION_OUTPUT_DIR,
-    pattern: str = "*_preds.csv",
+    pattern: str = "*_validation_preds.csv",
     show: bool = False,
     max_points: int = MAX_PLOT_POINTS,
 ) -> list[Path]:
@@ -1053,6 +1053,8 @@ def regenerate_prediction_plots(
 
 
 def get_model_folder_name(filename_stem: str) -> str:
+    if filename_stem.endswith("_validation_preds"):
+        return filename_stem.removesuffix("_validation_preds")
     if filename_stem.endswith("_preds"):
         return filename_stem.removesuffix("_preds")
     return filename_stem

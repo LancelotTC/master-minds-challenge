@@ -94,14 +94,17 @@
         "best_score": -14.202261815544285,
         "best_params": {
             "colsample_bytree": 0.7196824310763862,
-            "learning_rate": 0.051658231429436756,
+            "learning_rate": 0.03,
             "max_depth": 13,
             "min_child_samples": 34,
-            "n_estimators": 1623,
-            "num_leaves": 265,
+            "n_estimators": 1200,
+            "num_leaves": 31,
             "reg_alpha": 0.001,
             "reg_lambda": 0.001,
-            "subsample": 0.6680432854464112
+            "subsample": 0.6680432854464112,
+            "feature_fraction": 0.8,
+            "bagging_fraction": 0.8,
+            "bagging_freq": 5
         },
         "training_rows": 100000
     }
