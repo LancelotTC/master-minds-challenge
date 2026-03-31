@@ -686,11 +686,11 @@ def clean_dataframe(
     runtime_config = runtime_config or load_model_runtime_config()
     cleaned = dataframe.copy()
 
-    cleaned["LTScheduledDatetime"] = pd.to_datetime(cleaned["LTScheduledDatetime"], format="%Y-%m-%d %H:%M:%S")
+    # cleaned["LTScheduledDatetime"] = pd.to_datetime(cleaned["LTScheduledDatetime"], format="%Y-%m-%d %H:%M:%S")
 
-    cleaned = cleaned[cleaned["LTScheduledDatetime"] < datetime(2026, 3, 1)].sort_values("LTScheduledDatetime")
+    # cleaned = cleaned[cleaned["LTScheduledDatetime"] < datetime(2026, 3, 24)].sort_values("LTScheduledDatetime")
 
-    cleaned = cleaned[cleaned["NbOfSeats"] >= cleaned["NbPaxTotal"]]
+    # cleaned = cleaned[cleaned["NbOfSeats"] >= cleaned["NbPaxTotal"]]
 
     for column_name in cleaned.columns:
         cleaned[column_name] = replace_null_like_values(cleaned[column_name])
