@@ -33,6 +33,8 @@ CV_FOLDS = 5
 JOBS = -1
 RESULTS_FILENAME = "hyperparameters.json"
 RESULTS_PATH = Path(__file__).resolve().parent / RESULTS_FILENAME
+
+
 def integer_range(lower: int, upper: int) -> Integer:
     if lower >= upper:
         upper = lower + 1
@@ -69,55 +71,55 @@ def build_models(features):
     preprocessor = make_preprocessor(features)
 
     return {
-        "XGBRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    ("model", XGBRegressor(random_state=RANDOM_SEED)),
-                ]
-            ),
-            {
-                "model__n_estimators": integer_range(200, 4000),
-                "model__learning_rate": Real(0.003, 0.3, prior="log-uniform"),
-                "model__max_depth": integer_range(2, 16),
-                "model__max_leaves": integer_range(16, 1024),
-                "model__min_child_weight": integer_range(1, 80),
-                "model__subsample": Real(0.5, 1.0),
-                "model__colsample_bytree": Real(0.4, 1.0),
-                "model__colsample_bylevel": Real(0.4, 1.0),
-                "model__colsample_bynode": Real(0.4, 1.0),
-                "model__gamma": Real(1e-8, 10.0, prior="log-uniform"),
-                "model__reg_lambda": Real(1e-4, 100.0, prior="log-uniform"),
-                "model__reg_alpha": Real(1e-4, 100.0, prior="log-uniform"),
-                "model__max_bin": integer_range(64, 512),
-                "model__grow_policy": Categorical(["depthwise", "lossguide"]),
-                "model__objective": Categorical(["reg:absoluteerror"]),
-                "model__eval_metric": Categorical(["mae"]),
-                "model__tree_method": Categorical(["hist"]),
-            },
-        ),
-        "HistGradientBoostingRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    (
-                        "model",
-                        HistGradientBoostingRegressor(random_state=RANDOM_SEED),
-                    ),
-                ]
-            ),
-            {
-                "model__learning_rate": Real(0.003, 0.3, prior="log-uniform"),
-                "model__max_depth": integer_range(2, 20),
-                "model__max_iter": integer_range(200, 4000),
-                "model__max_leaf_nodes": integer_range(15, 255),
-                "model__l2_regularization": Real(1e-8, 100.0, prior="log-uniform"),
-                "model__min_samples_leaf": integer_range(5, 500),
-                "model__max_bins": Integer(64, 255),
-                "model__early_stopping": Categorical([False]),
-                "model__loss": Categorical(["absolute_error"]),
-            },
-        ),
+        # "XGBRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             ("model", XGBRegressor(random_state=RANDOM_SEED)),
+        #         ]
+        #     ),
+        #     {
+        #         "model__n_estimators": integer_range(200, 4000),
+        #         "model__learning_rate": Real(0.003, 0.3, prior="log-uniform"),
+        #         "model__max_depth": integer_range(2, 16),
+        #         "model__max_leaves": integer_range(16, 1024),
+        #         "model__min_child_weight": integer_range(1, 80),
+        #         "model__subsample": Real(0.5, 1.0),
+        #         "model__colsample_bytree": Real(0.4, 1.0),
+        #         "model__colsample_bylevel": Real(0.4, 1.0),
+        #         "model__colsample_bynode": Real(0.4, 1.0),
+        #         "model__gamma": Real(1e-8, 10.0, prior="log-uniform"),
+        #         "model__reg_lambda": Real(1e-4, 100.0, prior="log-uniform"),
+        #         "model__reg_alpha": Real(1e-4, 100.0, prior="log-uniform"),
+        #         "model__max_bin": integer_range(64, 512),
+        #         "model__grow_policy": Categorical(["depthwise", "lossguide"]),
+        #         "model__objective": Categorical(["reg:absoluteerror"]),
+        #         "model__eval_metric": Categorical(["mae"]),
+        #         "model__tree_method": Categorical(["hist"]),
+        #     },
+        # ),
+        # "HistGradientBoostingRegressor": (
+        #     Pipeline(
+        #         [
+        #             ("preprocess", preprocessor),
+        #             (
+        #                 "model",
+        #                 HistGradientBoostingRegressor(random_state=RANDOM_SEED),
+        #             ),
+        #         ]
+        #     ),
+        #     {
+        #         "model__learning_rate": Real(0.003, 0.3, prior="log-uniform"),
+        #         "model__max_depth": integer_range(2, 20),
+        #         "model__max_iter": integer_range(200, 4000),
+        #         "model__max_leaf_nodes": integer_range(15, 255),
+        #         "model__l2_regularization": Real(1e-8, 100.0, prior="log-uniform"),
+        #         "model__min_samples_leaf": integer_range(5, 500),
+        #         "model__max_bins": Integer(64, 255),
+        #         "model__early_stopping": Categorical([False]),
+        #         "model__loss": Categorical(["absolute_error"]),
+        #     },
+        # ),
         "LGBMRegressor": (
             Pipeline(
                 [

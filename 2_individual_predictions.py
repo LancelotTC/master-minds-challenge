@@ -89,18 +89,18 @@ def get_predictions_from_datetime_split(model, features, target, prediction_feat
 def build_enabled_regressors(results: dict[str, dict[str, object]]) -> dict[str, object]:
     regressors = {}
 
-    # if "XGBRegressor" in results:
-    #     best_params = clean_model_params(results["XGBRegressor"]["best_params"])
-    #     regressors["XGBRegressor"] = XGBRegressor(**best_params)
+    if "XGBRegressor" in results:
+        best_params = clean_model_params(results["XGBRegressor"]["best_params"])
+        regressors["XGBRegressor"] = XGBRegressor(**best_params)
 
-    if "LGBMRegressor" in results:
-        regressors["LGBMRegressor"] = LGBMRegressor(
-            random_state=42,
-            objective="mae",
-            verbosity=-1,
-            force_col_wise=True,
-            **clean_model_params(results["LGBMRegressor"]["best_params"]),
-        )
+    # if "LGBMRegressor" in results:
+    #     regressors["LGBMRegressor"] = LGBMRegressor(
+    #         random_state=42,
+    #         objective="mae",
+    #         verbosity=-1,
+    #         force_col_wise=True,
+    #         **clean_model_params(results["LGBMRegressor"]["best_params"]),
+    #     )
 
     # if "DecisionTreeRegressor" in results:
     #     regressors["DecisionTreeRegressor"] = DecisionTreeRegressor(
@@ -188,9 +188,7 @@ def main():
             )
         )
         print(f"Predictions written to {output_path}")
-        print(
-            f"Validation predictions and validation-only plot source written to {validation_output_path}"
-        )
+        print(f"Validation predictions and validation-only plot source written to {validation_output_path}")
 
 
 if __name__ == "__main__":

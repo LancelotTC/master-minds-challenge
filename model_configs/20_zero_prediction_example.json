@@ -31,15 +31,15 @@
         "operator": "is_null"
       }
     },
-    // {
-    //   "name": "force_zero_when_IdBusinessUnitType_is_9",
-    //   "set_prediction": 0,
-    //   "when": {
-    //     "column": "IdBusinessUnitType",
-    //     "operator": "in",
-    //     "value": [2, 3, 4, 9]
-    //   }
-    // }
+    {
+      "name": "force_zero_when_IdBusinessUnitType_is_9",
+      "set_prediction": 0,
+      "when": {
+        "column": "IdBusinessUnitType",
+        "operator": "eq",
+        "value": 9
+      }
+    }
     // {
     //   "name": "force_zero_when_IdBusinessUnitType_in_2_3_4_9",
     //   "set_prediction": 0,

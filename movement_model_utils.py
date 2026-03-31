@@ -15,6 +15,7 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
 from tqdm.auto import tqdm
+from datetime import datetime
 
 MAIN_DATASET_PATH = Path("data") / "main_dataset.csv"
 ID_COLUMN = "IdMovement"
@@ -683,6 +684,12 @@ def clean_dataframe(
     runtime_config = runtime_config or load_model_runtime_config()
     cleaned = dataframe.copy()
 
+    cleaned["LTScheduledDatetime"] = pd.to_datetime(cleaned["LTScheduledDatetime"], format="%Y-%m-%d %H:%M:%S")
+
+    cleaned = cleaned[cleaned["LTScheduledDatetime"] < datetime(2026, 3, 1)].sort_values("LTScheduledDatetime")
+
+    cleaned = cleaned[cleaned["NbOfSeats"] >= cleaned["NbPaxTotal"]]
+
     for column_name in cleaned.columns:
         cleaned[column_name] = replace_null_like_values(cleaned[column_name])
 
@@ -704,6 +711,7 @@ def clean_dataframe(
     for column_name in object_columns:
         cleaned[column_name] = cleaned[column_name].replace({pd.NA: np.nan})
 
+    cleaned.to_csv("test.csv")
     return cleaned
 
 
@@ -872,7 +880,9 @@ def write_predictions(
     )
     clipped_predictions = np.clip(np.rint(np.asarray(adjusted_predictions)), 0, None).astype(int)
     output_columns = [
-        column_name for column_name in [ROW_ID_COLUMN, ID_COLUMN, "LTScheduledDatetime", TARGET_COLUMN] if column_name in output.columns
+        column_name
+        for column_name in [ROW_ID_COLUMN, ID_COLUMN, "LTScheduledDatetime", TARGET_COLUMN]
+        if column_name in output.columns
     ]
     output = output[output_columns].copy()
     output[PREDICTION_COLUMN] = clipped_predictions
