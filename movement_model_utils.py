@@ -788,7 +788,13 @@ def load_training_and_prediction_frames(
     training_target = target.loc[training_mask].astype(float)
 
     prediction_identifier_columns = _deduplicate_preserve_order(
-        [ROW_ID_COLUMN, ID_COLUMN, "LTScheduledDatetime", *runtime_config.prediction_override_columns]
+        [
+            ROW_ID_COLUMN,
+            ID_COLUMN,
+            "FlightNumberNormalized",
+            "LTScheduledDatetime",
+            *runtime_config.prediction_override_columns,
+        ]
     )
     if prediction_mode == PREDICTION_MODE_KNOWN_TARGET:
         prediction_mask = training_mask
@@ -1050,6 +1056,49 @@ def write_predictions(
     output_path = model_output_dir / f"{filename_stem}.csv"
     output.to_csv(output_path, index=False)
     return output_path
+
+
+def write_test_prediction_subset(
+    predictions: np.ndarray | list[float],
+    identifiers: pd.DataFrame,
+    filename_stem: str,
+    test_start_date: str | pd.Timestamp,
+    test_end_date: str | pd.Timestamp,
+) -> tuple[Path, int]:
+    if "FlightNumberNormalized" not in identifiers.columns:
+        raise RuntimeError("Test prediction export requires 'FlightNumberNormalized' in the prediction identifiers.")
+    if "LTScheduledDatetime" not in identifiers.columns:
+        raise RuntimeError("Test prediction export requires 'LTScheduledDatetime' in the prediction identifiers.")
+
+    runtime_config = load_model_runtime_config()
+    output = identifiers.copy()
+    adjusted_predictions = apply_prediction_overrides(
+        predictions,
+        output,
+        runtime_config.prediction_overrides,
+    )
+    clipped_predictions = np.clip(np.rint(np.asarray(adjusted_predictions)), 0, None).astype(int)
+
+    test_start = pd.to_datetime(test_start_date).normalize()
+    test_end = pd.to_datetime(test_end_date).normalize()
+    if pd.isna(test_start) or pd.isna(test_end):
+        raise ValueError("Both test_start_date and test_end_date must be valid dates.")
+    if test_start > test_end:
+        raise ValueError("test_start_date must be on or before test_end_date.")
+
+    output[PREDICTION_COLUMN] = clipped_predictions
+    scheduled = pd.to_datetime(output["LTScheduledDatetime"], errors="coerce").dt.normalize()
+    test_output = output.loc[scheduled.between(test_start, test_end, inclusive="both")].copy()
+    test_output = test_output[
+        ["FlightNumberNormalized", "LTScheduledDatetime", PREDICTION_COLUMN]
+    ].rename(columns={PREDICTION_COLUMN: "Predicted NbPaxTotal"})
+
+    model_folder_name = get_model_folder_name(filename_stem)
+    model_output_dir = PREDICTION_OUTPUT_DIR / model_folder_name
+    model_output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = model_output_dir / f"{filename_stem}_test_set.csv"
+    test_output.to_csv(output_path, index=False)
+    return output_path, len(test_output)
 
 
 def _prepare_prediction_plot_data(dataframe: pd.DataFrame) -> pd.DataFrame:

@@ -18,9 +18,12 @@ from vacances_scolaires_france import SchoolHolidayDates
 DATA_FOLDER = Path("data")
 WEATHER_FOLDER = DATA_FOLDER / "weather"
 HOLIDAYS_FOLDER = DATA_FOLDER / "holidays"
+WORLD_EVENTS_FOLDER = DATA_FOLDER / "world_events"
 ORIGINAL_DATASET_FILE = DATA_FOLDER / "original_dataset.csv"
 MAIN_DATASET_FILE = DATA_FOLDER / "main_dataset.csv"
 WEATHER_FILE = WEATHER_FOLDER / "weather.csv"
+WORLD_EVENTS_AIRPORTS_FILE = WORLD_EVENTS_FOLDER / "clean_airports.parquet"
+WORLD_EVENTS_RISK_FILE = WORLD_EVENTS_FOLDER / "smoothed_risk_events.parquet"
 
 DAY_OFF_COLUMNS = [
     "is_fr_public_holiday",
@@ -68,6 +71,7 @@ def ensure_data_directories() -> None:
     DATA_FOLDER.mkdir(exist_ok=True)
     WEATHER_FOLDER.mkdir(exist_ok=True)
     HOLIDAYS_FOLDER.mkdir(exist_ok=True)
+    WORLD_EVENTS_FOLDER.mkdir(exist_ok=True)
 
 
 def _normalize_filename(filename: str) -> str:
@@ -89,7 +93,10 @@ def _find_holiday_csv(folder: Path, candidate_names: list[str]) -> Path | None:
 
 
 def _pick_column(columns: pd.Index, candidates: list[str]) -> str | None:
-    lowered = {str(column).strip().lower(): str(column) for column in columns}
+    lowered = {
+        str(column).replace("\ufeff", "").strip().lower(): str(column)
+        for column in columns
+    }
     for candidate in candidates:
         match = lowered.get(candidate.lower())
         if match is not None:
@@ -116,6 +123,66 @@ def _normalize_country_code_series(series: pd.Series) -> pd.Series:
     return normalized.replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA})
 
 
+def _add_world_event_risk_features(flights: pd.DataFrame) -> pd.DataFrame:
+    enriched = flights.copy()
+
+    stale_columns = [
+        column_name
+        for column_name in ["risk_score", "world_event_country_code", "world_event_date"]
+        if column_name in enriched.columns
+    ]
+    if stale_columns:
+        enriched = enriched.drop(columns=stale_columns)
+
+    if "AirportPrevious" not in enriched.columns or "LTScheduledDatetime" not in enriched.columns:
+        enriched["risk_score"] = 0.0
+        return enriched
+
+    if not WORLD_EVENTS_AIRPORTS_FILE.exists() or not WORLD_EVENTS_RISK_FILE.exists():
+        print(
+            "Warning: world event parquet files not found in "
+            f"{WORLD_EVENTS_FOLDER}. Risk score will default to 0.0."
+        )
+        enriched["risk_score"] = 0.0
+        return enriched
+
+    airports = pd.read_parquet(WORLD_EVENTS_AIRPORTS_FILE, columns=["iata_code", "iso_country"])
+    risk_events = pd.read_parquet(WORLD_EVENTS_RISK_FILE, columns=["iso_country", "Date", "SmoothedRisk"])
+
+    airports["iata_code"] = _normalize_airport_code_series(airports["iata_code"])
+    airports["iso_country"] = _normalize_country_code_series(airports["iso_country"])
+
+    risk_events["iso_country"] = _normalize_country_code_series(risk_events["iso_country"])
+    risk_events["Date"] = pd.to_datetime(risk_events["Date"], errors="coerce").dt.normalize()
+    risk_events["SmoothedRisk"] = pd.to_numeric(risk_events["SmoothedRisk"], errors="coerce")
+    risk_events = (
+        risk_events.rename(columns={"iso_country": "world_event_country_code", "Date": "world_event_date"})
+        .dropna(subset=["world_event_country_code", "world_event_date"])
+        .drop_duplicates(subset=["world_event_country_code", "world_event_date"], keep="last")
+    )
+
+    enriched["AirportPrevious"] = _normalize_airport_code_series(enriched["AirportPrevious"])
+    enriched["world_event_date"] = pd.to_datetime(enriched["LTScheduledDatetime"], errors="coerce").dt.normalize()
+
+    airport_lookup = airports.rename(
+        columns={
+            "iata_code": "AirportPrevious",
+            "iso_country": "world_event_country_code",
+        }
+    ).drop_duplicates(subset=["AirportPrevious"], keep="first")
+
+    enriched = enriched.merge(airport_lookup, on="AirportPrevious", how="left")
+    enriched = enriched.merge(
+        risk_events,
+        on=["world_event_country_code", "world_event_date"],
+        how="left",
+    )
+
+    enriched["risk_score"] = pd.to_numeric(enriched["SmoothedRisk"], errors="coerce").fillna(0.0)
+    enriched = enriched.drop(columns=["SmoothedRisk", "world_event_country_code", "world_event_date"], errors="ignore")
+    return enriched
+
+
 def _normalize_direction_value(value: object) -> str | None:
     normalized = _normalize_text_key(value)
     letters_only = "".join(character for character in normalized or "" if character.isalpha())
@@ -127,49 +194,27 @@ def _normalize_direction_value(value: object) -> str | None:
 
 
 def _load_airports_dataset() -> pd.DataFrame:
-    airports_candidates = [
-        "upply-airports.csv",
-        "uply-airports.csv",
-        "upply_airports.csv",
-        "airports.csv",
-    ]
-    airports_path = _find_holiday_csv(HOLIDAYS_FOLDER, airports_candidates)
-    if airports_path is None:
+    if not WORLD_EVENTS_AIRPORTS_FILE.exists():
         print(
-            f"Warning: no airport mapping CSV found in {HOLIDAYS_FOLDER}. "
-            "Country-dependent route features will default to missing values."
-        )
-        return pd.DataFrame(columns=["airport_code", "country_code"])
-
-    airports_raw = pd.read_csv(airports_path, sep=None, engine="python")
-    code_column = _pick_column(
-        airports_raw.columns,
-        ["code", "airportprevious", "airport_code", "airportcode", "iata", "iata_code"],
-    )
-    country_column = _pick_column(
-        airports_raw.columns,
-        ["country_code", "country_iso_code", "dest_country", "country"],
-    )
-
-    if code_column is None or country_column is None:
-        print(
-            f"Warning: airports CSV '{airports_path.name}' does not contain expected columns. "
+            f"Warning: airport mapping parquet not found at {WORLD_EVENTS_AIRPORTS_FILE}. "
             "Country-dependent route features will default to missing values."
         )
         return pd.DataFrame(columns=["airport_code", "country_code"])
 
     airports = (
-        airports_raw.rename(columns={code_column: "airport_code", country_column: "country_code"})[
+        pd.read_parquet(WORLD_EVENTS_AIRPORTS_FILE, columns=["iata_code", "iso_country"]).rename(
+            columns={"iata_code": "airport_code", "iso_country": "country_code"}
+        )[
             ["airport_code", "country_code"]
         ]
         .assign(
             airport_code=lambda df: _normalize_airport_code_series(df["airport_code"]),
             country_code=lambda df: _normalize_country_code_series(df["country_code"]),
         )
-        .dropna(subset=["airport_code"])
+        .dropna(subset=["airport_code", "country_code"])
         .drop_duplicates()
     )
-    print(f"Loaded airport mapping from {airports_path}")
+    print(f"Loaded airport mapping from {WORLD_EVENTS_AIRPORTS_FILE}")
     return airports
 
 
@@ -731,7 +776,18 @@ def _get_season(month: float) -> str | None:
 def merge_datasets() -> None:
     load_weather_data()
     load_holiday_data()
+    load_world_event_data()
     apply_preprocessing()
+
+
+def load_world_event_data() -> None:
+    if not MAIN_DATASET_FILE.exists():
+        raise FileNotFoundError(f"Main dataset not found at {MAIN_DATASET_FILE}")
+
+    flights = pd.read_csv(MAIN_DATASET_FILE)
+    flights = _add_world_event_risk_features(flights)
+    flights.to_csv(MAIN_DATASET_FILE, index=False, encoding="utf-8-sig")
+    print(f"World event risk features saved to {MAIN_DATASET_FILE}")
 
 
 def apply_preprocessing(

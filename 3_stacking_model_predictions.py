@@ -19,14 +19,17 @@ from movement_model_utils import (
     plot_prediction_results,
     run_progress_step,
     write_predictions,
+    write_test_prediction_subset,
 )
 
 PREDICTION_MODE = PREDICTION_MODE_MISSING_TARGET
+TEST_START_DATE = "2026-04-08"
+TEST_END_DATE = "2026-10-25"
 
 
 @track_emissions()
 def main():
-    with tqdm(total=8, desc="Stacking workflow", unit="step") as progress:
+    with tqdm(total=9, desc="Stacking workflow", unit="step") as progress:
         training_features, training_target, prediction_features, prediction_ids = run_progress_step(
             progress,
             "load_data",
@@ -69,7 +72,18 @@ def main():
             prediction_ids,
             "stacking_regressor_preds",
         )
+        test_output_path = run_progress_step(
+            progress,
+            "write_test_csv",
+            write_test_prediction_subset,
+            predictions,
+            prediction_ids,
+            "stacking_regressor_preds",
+            TEST_START_DATE,
+            TEST_END_DATE,
+        )
         print(f"Predictions written to {output_path}")
+        print(f"Test-set predictions written to {test_output_path[0]} ({test_output_path[1]:,} rows)")
         run_progress_step(progress, "plot", plot_prediction_results, output_path)
 
 

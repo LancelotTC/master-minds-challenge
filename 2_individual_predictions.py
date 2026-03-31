@@ -39,17 +39,6 @@ VALIDATION_START_DATE = "2026-03-17"
 VALIDATION_END_DATE = "2026-03-24"
 
 
-class ColorString:
-    BLUE = "blue"
-
-    def __init__(self, string: str, fg: Optional[str] = None):
-        color_code = {"blue": 34}.get(fg, 0)
-        self.string = f"\033[{color_code}m{string}\033[0m"
-
-    def __str__(self):
-        return self.string
-
-
 def params_without(params: dict[str, object], *excluded_keys: str) -> dict[str, object]:
     excluded = set(excluded_keys)
     return {key: value for key, value in params.items() if key not in excluded}
@@ -256,10 +245,7 @@ def main():
             run_progress_step(step_progress, "plot", plot_prediction_results, validation_output_path)
 
         print(
-            ColorString(
-                (f"{name} validation R2: {validation_r2:.4f} | " f"validation MAE: {validation_mae:.4f}"),
-                fg="blue",
-            )
+            f"\033[34m{f"{name} validation R2: {validation_r2:.4f} | " f"validation MAE: {validation_mae:.4f}"}\033[0m"
         )
         print(f"Predictions written to {output_path}")
         print(f"Validation predictions and validation-only plot source written to {validation_output_path}")
