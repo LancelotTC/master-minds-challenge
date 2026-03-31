@@ -51,6 +51,11 @@ LAG_ROLLING_COLUMNS = [
     "pax_diff_7",
 ]
 
+# Lyon Saint-Exupéry coordinates (fallback if not found in airports CSV)
+LYON_AIRPORT_CODE = "LYS"
+LYON_LAT_FALLBACK = 45.725556
+LYON_LON_FALLBACK = 4.8414
+
 WEATHER_BASE_PARAMS = {
     "latitude": 45.7589,
     "longitude": 4.8414,
@@ -166,6 +171,109 @@ def _load_airports_dataset() -> pd.DataFrame:
     )
     print(f"Loaded airport mapping from {airports_path}")
     return airports
+
+
+def _load_airports_with_coords() -> pd.DataFrame:
+    """Load airports CSV keeping latitude and longitude columns."""
+    airports_candidates = [
+        "upply-airports.csv",
+        "airports.csv",
+    ]
+    airports_path = _find_holiday_csv(HOLIDAYS_FOLDER, airports_candidates)
+    if airports_path is None:
+        return pd.DataFrame(columns=["airport_code", "latitude", "longitude"])
+
+    airports_raw = pd.read_csv(airports_path, sep=None, engine="python")
+    code_column = _pick_column(
+        airports_raw.columns,
+        ["code", "airportprevious", "airport_code", "airportcode", "iata", "iata_code"],
+    )
+    lat_column = _pick_column(airports_raw.columns, ["latitude", "lat"])
+    lon_column = _pick_column(airports_raw.columns, ["longitude", "lon", "lng"])
+
+    if code_column is None or lat_column is None or lon_column is None:
+        return pd.DataFrame(columns=["airport_code", "latitude", "longitude"])
+
+    airports = (
+        airports_raw.rename(columns={
+            code_column: "airport_code",
+            lat_column: "latitude",
+            lon_column: "longitude",
+        })[["airport_code", "latitude", "longitude"]]
+        .assign(
+            airport_code=lambda df: _normalize_airport_code_series(df["airport_code"]),
+            latitude=lambda df: pd.to_numeric(df["latitude"], errors="coerce"),
+            longitude=lambda df: pd.to_numeric(df["longitude"], errors="coerce"),
+        )
+        .dropna(subset=["airport_code", "latitude", "longitude"])
+        .drop_duplicates(subset=["airport_code"])
+    )
+    return airports
+
+
+def _haversine_km(
+    lat_series: pd.Series,
+    lon_series: pd.Series,
+    fixed_lat: float,
+    fixed_lon: float,
+) -> pd.Series:
+    """Vectorised Haversine distance (km) from each row to a fixed point."""
+    R = 6371.0
+    lat1_r = np.radians(lat_series)
+    lat2_r = np.radians(fixed_lat)
+    dlat = lat2_r - lat1_r
+    dlon = np.radians(fixed_lon - lon_series)
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1_r) * np.cos(lat2_r) * np.sin(dlon / 2) ** 2
+    return pd.Series(2 * R * np.arcsin(np.sqrt(a.clip(0, 1))), index=lat_series.index)
+
+
+def add_distance_features(flights: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add flight_distance_km: great-circle distance (km) between Lyon (LYS) and
+    the remote airport (AirportPrevious).
+
+    Continuous distance is preferred over a binary is_long_haul flag because
+    tree-based models learn their own split thresholds; the discrete version
+    loses information without any benefit for those algorithms.
+    """
+    processed = flights.copy()
+
+    if "flight_distance_km" in processed.columns:
+        processed = processed.drop(columns=["flight_distance_km"])
+
+    if "AirportPrevious" not in processed.columns:
+        processed["flight_distance_km"] = np.nan
+        return processed
+
+    airports_coords = _load_airports_with_coords()
+    if airports_coords.empty:
+        processed["flight_distance_km"] = np.nan
+        return processed
+
+    # Get Lyon's coordinates from the CSV; fall back to hardcoded values.
+    lyon_row = airports_coords.loc[airports_coords["airport_code"] == LYON_AIRPORT_CODE]
+    lyon_lat = float(lyon_row["latitude"].iloc[0]) if not lyon_row.empty else LYON_LAT_FALLBACK
+    lyon_lon = float(lyon_row["longitude"].iloc[0]) if not lyon_row.empty else LYON_LON_FALLBACK
+
+    remote_coords = airports_coords.rename(columns={
+        "airport_code": "AirportPrevious",
+        "latitude": "_remote_lat",
+        "longitude": "_remote_lon",
+    })
+    processed = processed.merge(remote_coords, on="AirportPrevious", how="left")
+
+    has_coords = processed["_remote_lat"].notna() & processed["_remote_lon"].notna()
+    distance = pd.Series(np.nan, index=processed.index)
+    if has_coords.any():
+        distance.loc[has_coords] = _haversine_km(
+            processed.loc[has_coords, "_remote_lat"],
+            processed.loc[has_coords, "_remote_lon"],
+            lyon_lat,
+            lyon_lon,
+        )
+    processed["flight_distance_km"] = distance
+    processed = processed.drop(columns=["_remote_lat", "_remote_lon"], errors="ignore")
+    return processed
 
 
 def _load_destination_holidays_dataset() -> pd.DataFrame:
@@ -639,6 +747,7 @@ def apply_preprocessing(
     flights = add_cyclical_datetime_features(flights)
     flights = add_day_off_countdown_features(flights)
     flights = add_lag_and_rolling_features(flights)
+    flights = add_distance_features(flights)
 
     flights.to_csv(output_path, index=False, encoding="utf-8-sig")
     print(f"Preprocessed dataset saved to {output_path}")

@@ -84,9 +84,11 @@ ENGINEERED_FEATURE_COLUMNS = [
     "pax_lag_7",
     "pax_lag_30",
     "pax_rolling_7",
-    "pax_ewm_7", # exponential weighted mean
+    "pax_ewm_7",  # exponential weighted mean
     "pax_diff_1",
     "pax_diff_7",
+    # distance feature
+    "flight_distance_km",  # Haversine distance Lyon (LYS) ↔ AirportPrevious
 ]
 
 FEATURE_COLUMNS = [
