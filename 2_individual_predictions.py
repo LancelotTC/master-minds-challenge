@@ -31,6 +31,10 @@ from movement_model_utils import (
 )
 
 PREDICTION_MODE = PREDICTION_MODE_KNOWN_TARGET
+TRAINING_START_DATE = "2023-01-01"
+TRAINING_END_DATE = "2025-12-31"
+VALIDATION_START_DATE = "2026-03-17"
+VALIDATION_END_DATE = "2026-03-24"
 
 
 class ColorString:
@@ -58,18 +62,43 @@ def build_prediction_pipeline(model, features):
     )
 
 
-def split_training_data_by_datetime(features, target):
+def split_training_data_by_datetime(
+    features,
+    target,
+    training_start_date: str,
+    training_end_date: str,
+    validation_start_date: str,
+    validation_end_date: str,
+):
     ordered_features, ordered_target = sort_features_and_target_by_datetime(features, target)
     return split_train_validation_by_date(
         ordered_features,
         ordered_target,
+        training_start_date=training_start_date,
+        training_end_date=training_end_date,
+        validation_start_date=validation_start_date,
+        validation_end_date=validation_end_date,
     )
 
 
-def get_predictions_from_datetime_split(model, features, target, prediction_features, step_progress=None):
+def get_predictions_from_datetime_split(
+    model,
+    features,
+    target,
+    prediction_features,
+    training_start_date: str,
+    training_end_date: str,
+    validation_start_date: str,
+    validation_end_date: str,
+    step_progress=None,
+):
     X_train, X_val, y_train, y_val = split_training_data_by_datetime(
         features,
         target,
+        training_start_date=training_start_date,
+        training_end_date=training_end_date,
+        validation_start_date=validation_start_date,
+        validation_end_date=validation_end_date,
     )
     pipeline = build_prediction_pipeline(model, X_train)
 
@@ -140,8 +169,24 @@ def build_enabled_regressors(results: dict[str, dict[str, object]]) -> dict[str,
     return regressors
 
 
+def validate_split_date_constants() -> None:
+    required_dates = {
+        "TRAINING_START_DATE": TRAINING_START_DATE,
+        "TRAINING_END_DATE": TRAINING_END_DATE,
+        "VALIDATION_START_DATE": VALIDATION_START_DATE,
+        "VALIDATION_END_DATE": VALIDATION_END_DATE,
+    }
+    missing_names = [name for name, value in required_dates.items() if not value]
+    if missing_names:
+        raise RuntimeError(
+            "Set the date range constants at the top of 2_individual_predictions.py before running: "
+            + ", ".join(missing_names)
+        )
+
+
 @track_emissions()
 def main():
+    validate_split_date_constants()
     training_features, training_target, prediction_features, prediction_ids = load_training_and_prediction_frames(
         prediction_mode=PREDICTION_MODE
     )
@@ -159,6 +204,10 @@ def main():
                     training_features,
                     training_target,
                     prediction_features,
+                    training_start_date=TRAINING_START_DATE,
+                    training_end_date=TRAINING_END_DATE,
+                    validation_start_date=VALIDATION_START_DATE,
+                    validation_end_date=VALIDATION_END_DATE,
                     step_progress=step_progress,
                 )
             )

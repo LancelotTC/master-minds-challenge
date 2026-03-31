@@ -572,25 +572,44 @@ def sort_features_and_target_by_datetime(
 def split_train_validation_by_date(
     features: pd.DataFrame,
     target: pd.Series,
-    validation_fraction: float = 0.05,
+    training_start_date: str | pd.Timestamp,
+    training_end_date: str | pd.Timestamp,
+    validation_start_date: str | pd.Timestamp,
+    validation_end_date: str | pd.Timestamp,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
-    if not 0 < validation_fraction < 1:
-        raise ValueError("validation_fraction must be between 0 and 1.")
-
     sorted_features, sorted_target = sort_features_and_target_by_datetime(features, target)
-    total_rows = len(sorted_features)
-    if total_rows < 2:
-        raise RuntimeError("Chronological validation split requires at least two rows.")
+    scheduled_dates = get_feature_datetimes(sorted_features).dt.normalize()
+    available_dates = scheduled_dates.dropna()
+    if available_dates.empty:
+        raise RuntimeError("Date-based validation split requires at least one valid scheduled date.")
 
-    validation_row_count = max(1, int(np.ceil(total_rows * validation_fraction)))
-    training_row_count = total_rows - validation_row_count
-    if training_row_count < 1:
-        training_row_count = total_rows - 1
-        validation_row_count = 1
+    training_start = pd.to_datetime(training_start_date).normalize()
+    training_end = pd.to_datetime(training_end_date).normalize()
+    validation_start = pd.to_datetime(validation_start_date).normalize()
+    validation_end = pd.to_datetime(validation_end_date).normalize()
 
-    training_mask = np.zeros(total_rows, dtype=bool)
-    training_mask[:training_row_count] = True
-    validation_mask = ~training_mask
+    if pd.isna(training_start) or pd.isna(training_end) or pd.isna(validation_start) or pd.isna(validation_end):
+        raise ValueError("All train/validation start and end dates must be valid dates.")
+    if training_start > training_end:
+        raise ValueError("training_start_date must be on or before training_end_date.")
+    if validation_start > validation_end:
+        raise ValueError("validation_start_date must be on or before validation_end_date.")
+    if training_end >= validation_start:
+        raise ValueError("Training date range must end before validation date range starts.")
+
+    training_mask = scheduled_dates.between(training_start, training_end, inclusive="both") | scheduled_dates.isna()
+    validation_mask = scheduled_dates.between(validation_start, validation_end, inclusive="both")
+
+    if not validation_mask.any():
+        raise RuntimeError("Date-based validation split produced an empty validation set.")
+    if not training_mask.any():
+        raise RuntimeError("Date-based validation split produced an empty training set.")
+
+    print(
+        "Date split -> "
+        f"train: {training_start.date()} to {training_end.date()} | "
+        f"validation: {validation_start.date()} to {validation_end.date()}"
+    )
 
     return (
         sorted_features.loc[training_mask].copy(),
