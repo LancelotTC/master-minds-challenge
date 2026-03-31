@@ -1,7 +1,9 @@
+from pathlib import Path
 from typing import Optional
 
 from catboost import CatBoostRegressor
 from codecarbon import track_emissions
+import pandas as pd
 
 from lightgbm import LGBMRegressor
 from sklearn.ensemble import (
@@ -20,9 +22,9 @@ from movement_model_utils import (
     clean_model_params,
     load_hyperparameter_results,
     load_training_and_prediction_frames,
-    make_preprocessor,
     PREDICTION_MODE_MISSING_TARGET,
     PREDICTION_MODE_KNOWN_TARGET,
+    make_model_pipeline,
     plot_prediction_results,
     run_progress_step,
     sort_features_and_target_by_datetime,
@@ -54,12 +56,7 @@ def params_without(params: dict[str, object], *excluded_keys: str) -> dict[str, 
 
 
 def build_prediction_pipeline(model, features):
-    return Pipeline(
-        [
-            ("preprocess", make_preprocessor(features)),
-            ("model", model),
-        ]
-    )
+    return make_model_pipeline(model, features)
 
 
 def split_training_data_by_datetime(
@@ -108,11 +105,35 @@ def get_predictions_from_datetime_split(
 
     return (
         prediction_rows,
-        X_val.index,
         validation_predictions,
         r2_score(y_val, validation_predictions),
         mean_absolute_error(y_val, validation_predictions),
     )
+
+
+def write_validation_prediction_subset(
+    full_predictions_path: str | Path,
+    validation_start_date: str,
+    validation_end_date: str,
+):
+    full_predictions_path = Path(full_predictions_path)
+    validation_output_path = full_predictions_path.with_name(
+        full_predictions_path.stem.replace("_preds", "_validation_preds") + full_predictions_path.suffix
+    )
+
+    full_predictions = pd.read_csv(full_predictions_path)
+    if "LTScheduledDatetime" not in full_predictions.columns:
+        raise RuntimeError("Validation prediction export requires 'LTScheduledDatetime' in the full prediction CSV.")
+
+    validation_start = pd.to_datetime(validation_start_date).normalize()
+    validation_end = pd.to_datetime(validation_end_date).normalize()
+    scheduled = pd.to_datetime(full_predictions["LTScheduledDatetime"], errors="coerce").dt.normalize()
+
+    validation_predictions = full_predictions.loc[
+        scheduled.between(validation_start, validation_end, inclusive="both")
+    ].copy()
+    validation_predictions.to_csv(validation_output_path, index=False)
+    return validation_output_path, len(validation_predictions)
 
 
 def build_enabled_regressors(results: dict[str, dict[str, object]]) -> dict[str, object]:
@@ -198,20 +219,17 @@ def main():
 
     for name, model in tqdm(regressors.items(), total=len(regressors), desc="Regressors", unit="model"):
         with tqdm(total=6, desc=f"{name}", unit="step", leave=False) as step_progress:
-            predictions, validation_indices, validation_predictions, validation_r2, validation_mae = (
-                get_predictions_from_datetime_split(
-                    model,
-                    training_features,
-                    training_target,
-                    prediction_features,
-                    training_start_date=TRAINING_START_DATE,
-                    training_end_date=TRAINING_END_DATE,
-                    validation_start_date=VALIDATION_START_DATE,
-                    validation_end_date=VALIDATION_END_DATE,
-                    step_progress=step_progress,
-                )
+            predictions, validation_predictions, validation_r2, validation_mae = get_predictions_from_datetime_split(
+                model,
+                training_features,
+                training_target,
+                prediction_features,
+                training_start_date=TRAINING_START_DATE,
+                training_end_date=TRAINING_END_DATE,
+                validation_start_date=VALIDATION_START_DATE,
+                validation_end_date=VALIDATION_END_DATE,
+                step_progress=step_progress,
             )
-
             output_path = run_progress_step(
                 step_progress,
                 "write_csv",
@@ -223,11 +241,18 @@ def main():
             validation_output_path = run_progress_step(
                 step_progress,
                 "write_val_csv",
-                write_predictions,
-                validation_predictions,
-                prediction_ids.loc[validation_indices],
-                f"{name}_validation_preds",
+                write_validation_prediction_subset,
+                output_path,
+                VALIDATION_START_DATE,
+                VALIDATION_END_DATE,
             )
+            if validation_output_path[1] != len(validation_predictions):
+                raise RuntimeError(
+                    "Validation prediction row mismatch: "
+                    f"{validation_output_path[1]:,} rows in validation subset vs "
+                    f"{len(validation_predictions):,} validation predictions."
+                )
+            validation_output_path = validation_output_path[0]
             run_progress_step(step_progress, "plot", plot_prediction_results, validation_output_path)
 
         print(

@@ -14,7 +14,7 @@ from movement_model_utils import (
     clean_model_params,
     load_hyperparameter_results,
     load_training_and_prediction_frames,
-    make_preprocessor,
+    make_model_pipeline,
     PREDICTION_MODE_MISSING_TARGET,
     plot_prediction_results,
     run_progress_step,
@@ -49,18 +49,13 @@ def main():
         meta_model = RidgeCV(alphas=[0.1, 1.0, 10.0])
 
         def build_stacked_model():
-            return Pipeline(
-                [
-                    ("preprocess", make_preprocessor(training_features)),
-                    (
-                        "stack",
-                        StackingRegressor(
-                            estimators=base_models,
-                            final_estimator=meta_model,
-                            n_jobs=10,
-                        ),
-                    ),
-                ]
+            return make_model_pipeline(
+                StackingRegressor(
+                    estimators=base_models,
+                    final_estimator=meta_model,
+                    n_jobs=10,
+                ),
+                training_features,
             )
 
         stacked_model = run_progress_step(progress, "build_pipeline", build_stacked_model)

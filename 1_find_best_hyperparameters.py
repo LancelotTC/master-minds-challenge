@@ -21,7 +21,7 @@ from tqdm.auto import tqdm
 from movement_model_utils import (
     build_datewise_cv_splits,
     load_training_and_prediction_frames,
-    make_preprocessor,
+    make_model_pipeline,
     sort_features_and_target_by_datetime,
 )
 
@@ -68,8 +68,6 @@ def prepare_data():
 
 
 def build_models(features):
-    preprocessor = make_preprocessor(features)
-
     return {
         # "XGBRegressor": (
         #     Pipeline(
@@ -121,19 +119,14 @@ def build_models(features):
         #     },
         # ),
         "LGBMRegressor": (
-            Pipeline(
-                [
-                    ("preprocess", preprocessor),
-                    (
-                        "model",
-                        LGBMRegressor(
-                            random_state=RANDOM_SEED,
-                            objective="mae",
-                            verbosity=-1,
-                            force_col_wise=True,
-                        ),
-                    ),
-                ]
+            make_model_pipeline(
+                LGBMRegressor(
+                    random_state=RANDOM_SEED,
+                    objective="mae",
+                    verbosity=-1,
+                    force_col_wise=True,
+                ),
+                features,
             ),
             {
                 "model__n_estimators": integer_range(200, 4000),

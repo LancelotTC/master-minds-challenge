@@ -9,11 +9,13 @@ from typing import Any, Callable, TypeVar
 
 import numpy as np
 import pandas as pd
+from prophet import Prophet
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
+from sklearn.base import BaseEstimator, TransformerMixin
 from tqdm.auto import tqdm
 from datetime import datetime
 
@@ -89,6 +91,13 @@ ENGINEERED_FEATURE_COLUMNS = [
     "pax_diff_7",
     # distance feature
     "flight_distance_km",  # Haversine distance Lyon (LYS) ↔ AirportPrevious
+]
+PROPHET_FEATURE_COLUMNS = [
+    "daily_seats",
+    "daily_forecast_pax",
+    "daily_forecast_load_factor",
+    "relative_seat_share_day",
+    "forecast_pax_per_seat_day",
 ]
 
 FEATURE_COLUMNS = [
@@ -834,6 +843,133 @@ def build_feature_dataframe(
     return features
 
 
+class ProphetDailyFeatureGenerator(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.model_: Prophet | None = None
+        self.fallback_daily_pax_: float = 0.0
+
+    def fit(self, X: pd.DataFrame, y=None):
+        if y is None:
+            raise ValueError("ProphetDailyFeatureGenerator requires target values during fit.")
+
+        dataframe = X.copy()
+        scheduled_dates = get_feature_datetimes(dataframe).dt.floor("D")
+        target_values = pd.to_numeric(pd.Series(y, index=dataframe.index), errors="coerce")
+
+        daily_train = (
+            pd.DataFrame(
+                {
+                    "date": scheduled_dates,
+                    "y": target_values,
+                },
+                index=dataframe.index,
+            )
+            .dropna(subset=["date", "y"])
+            .groupby("date", as_index=False)
+            .agg(y=("y", "sum"))
+            .sort_values("date")
+        )
+
+        if daily_train.empty:
+            raise RuntimeError("ProphetDailyFeatureGenerator could not build any dated training rows.")
+
+        self.fallback_daily_pax_ = float(daily_train["y"].mean())
+
+        if len(daily_train) < 2:
+            self.model_ = None
+            return self
+
+        prophet_train = daily_train.rename(columns={"date": "ds"})
+        self.model_ = Prophet(
+            yearly_seasonality=True,
+            weekly_seasonality=True,
+            daily_seasonality=False,
+        )
+        self.model_.fit(prophet_train)
+        return self
+
+    def transform(self, X: pd.DataFrame):
+        dataframe = X.copy()
+        scheduled_dates = get_feature_datetimes(dataframe).dt.floor("D")
+        seat_values = pd.to_numeric(dataframe["NbOfSeats"], errors="coerce")
+
+        daily_features = (
+            pd.DataFrame(
+                {
+                    "date": scheduled_dates,
+                    "NbOfSeats": seat_values,
+                },
+                index=dataframe.index,
+            )
+            .dropna(subset=["date"])
+            .groupby("date", as_index=False)
+            .agg(daily_seats=("NbOfSeats", "sum"))
+            .sort_values("date")
+        )
+
+        if daily_features.empty:
+            for column_name in PROPHET_FEATURE_COLUMNS:
+                dataframe[column_name] = np.nan
+            return dataframe
+
+        if self.model_ is None:
+            forecast_prophet = daily_features[["date"]].copy()
+            forecast_prophet["daily_forecast_pax"] = self.fallback_daily_pax_
+        else:
+            future_dates = daily_features[["date"]].rename(columns={"date": "ds"})
+            forecast_prophet = self.model_.predict(future_dates)[["ds", "yhat"]].rename(
+                columns={"ds": "date", "yhat": "daily_forecast_pax"}
+            )
+
+        forecast_prophet["daily_forecast_pax"] = np.clip(
+            pd.to_numeric(forecast_prophet["daily_forecast_pax"], errors="coerce").to_numpy(dtype=float),
+            0,
+            None,
+        )
+
+        daily_features = daily_features.merge(forecast_prophet, on="date", how="left")
+        clipped_daily_seats = np.clip(daily_features["daily_seats"].to_numpy(dtype=float), 1.0, None)
+        daily_features["daily_forecast_load_factor"] = daily_features["daily_forecast_pax"] / clipped_daily_seats
+
+        daily_feature_columns = [
+            "date",
+            "daily_seats",
+            "daily_forecast_pax",
+            "daily_forecast_load_factor",
+        ]
+        dataframe = dataframe.join(
+            daily_features[daily_feature_columns].set_index("date"),
+            on=scheduled_dates.rename("date"),
+        )
+
+        clipped_row_daily_seats = np.clip(
+            pd.to_numeric(dataframe["daily_seats"], errors="coerce").to_numpy(dtype=float),
+            1.0,
+            None,
+        )
+        row_seats = pd.to_numeric(seat_values, errors="coerce").to_numpy(dtype=float)
+        row_forecast = pd.to_numeric(dataframe["daily_forecast_pax"], errors="coerce").to_numpy(dtype=float)
+
+        dataframe["relative_seat_share_day"] = row_seats / clipped_row_daily_seats
+        dataframe["forecast_pax_per_seat_day"] = row_forecast / clipped_row_daily_seats
+        return dataframe
+
+
+def make_model_pipeline(model, features: pd.DataFrame) -> Pipeline:
+    augmented_features = features.copy()
+    for column_name in PROPHET_FEATURE_COLUMNS:
+        if column_name not in augmented_features.columns:
+            augmented_features[column_name] = np.nan
+
+    return Pipeline(
+        [
+            ("prophet_daily_features", ProphetDailyFeatureGenerator()),
+            ("preprocess", make_preprocessor(augmented_features)),
+            ("model", model),
+        ]
+    )
+
+
 def print_dataset_debug_summary(
     raw_dataframe: pd.DataFrame,
     target: pd.Series,
@@ -948,17 +1084,11 @@ def plot_prediction_results(
     predicted_full = full_plot_data[PREDICTION_COLUMN].to_numpy(dtype=float)
     residual_full = predicted_full - actual_full
     absolute_errors = np.abs(predicted_full - actual_full)
-    squared_errors = np.square(residual_full)
     mean_absolute_deviation = float(np.mean(absolute_errors))
-    median_absolute_deviation = float(np.median(absolute_errors))
-    root_mean_squared_error = float(np.sqrt(np.mean(squared_errors)))
-    actual_mean = float(np.mean(actual_full))
-    actual_standard_deviation = float(np.std(actual_full))
-    actual_median = float(np.median(actual_full))
-    predicted_mean = float(np.mean(predicted_full))
-    predicted_standard_deviation = float(np.std(predicted_full))
-    predicted_median = float(np.median(predicted_full))
-    residual_standard_deviation = float(np.std(residual_full))
+    actual_sum = float(np.sum(actual_full))
+    predicted_sum = float(np.sum(predicted_full))
+    predicted_to_real_total_ratio = float(predicted_sum / actual_sum) if actual_sum != 0 else np.nan
+    absolute_error_to_real_total_ratio = float(np.sum(absolute_errors) / actual_sum) if actual_sum != 0 else np.nan
 
     if max_points > 0 and len(plot_data) > max_points:
         plot_data = plot_data.sample(n=max_points, random_state=42)
@@ -1017,25 +1147,9 @@ def plot_prediction_results(
 
     stats_text = "\n".join(
         [
-            (
-                "MAE / MedAE / RMSE / Residual std: "
-                f"{mean_absolute_deviation:,.2f} / "
-                f"{median_absolute_deviation:,.2f} / "
-                f"{root_mean_squared_error:,.2f} / "
-                f"{residual_standard_deviation:,.2f}"
-            ),
-            (
-                "Actual mean / std / med: "
-                f"{actual_mean:,.2f} / "
-                f"{actual_standard_deviation:,.2f} / "
-                f"{actual_median:,.2f}"
-            ),
-            (
-                "Pred mean / std / med: "
-                f"{predicted_mean:,.2f} / "
-                f"{predicted_standard_deviation:,.2f} / "
-                f"{predicted_median:,.2f}"
-            ),
+            f"MAE: {mean_absolute_deviation:,.2f}",
+            f"sum(predicted)/sum(real): {predicted_to_real_total_ratio:,.4f}",
+            f"sum(abs(predicted - real))/sum(real): {absolute_error_to_real_total_ratio:,.4f}",
         ]
     )
     figure.text(

@@ -13,7 +13,7 @@ from movement_model_utils import (
     clean_model_params,
     load_hyperparameter_results,
     load_training_and_prediction_frames,
-    make_preprocessor,
+    make_model_pipeline,
     PREDICTION_MODE_MISSING_TARGET,
     plot_prediction_results,
     run_progress_step,
@@ -62,18 +62,13 @@ def main():
         print("Model weights:", dict(zip(models.keys(), weights)))
 
         def build_ensemble():
-            return Pipeline(
-                [
-                    ("preprocess", make_preprocessor(training_features)),
-                    (
-                        "voter",
-                        VotingRegressor(
-                            estimators=list(models.items()),
-                            weights=weights,
-                            n_jobs=10,
-                        ),
-                    ),
-                ]
+            return make_model_pipeline(
+                VotingRegressor(
+                    estimators=list(models.items()),
+                    weights=weights,
+                    n_jobs=10,
+                ),
+                training_features,
             )
 
         ensemble = run_progress_step(progress, "build_pipeline", build_ensemble)
