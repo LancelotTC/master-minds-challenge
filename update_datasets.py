@@ -41,6 +41,16 @@ WEATHER_FEATURE_COLUMNS = [
     "windspeed_10m_max",
 ]
 
+LAG_ROLLING_COLUMNS = [
+    "pax_lag_1",
+    "pax_lag_7",
+    "pax_lag_30",
+    "pax_rolling_7",
+    "pax_ewm_7",
+    "pax_diff_1",
+    "pax_diff_7",
+]
+
 WEATHER_BASE_PARAMS = {
     "latitude": 45.7589,
     "longitude": 4.8414,
@@ -628,9 +638,79 @@ def apply_preprocessing(
 
     flights = add_cyclical_datetime_features(flights)
     flights = add_day_off_countdown_features(flights)
+    flights = add_lag_and_rolling_features(flights)
 
     flights.to_csv(output_path, index=False, encoding="utf-8-sig")
     print(f"Preprocessed dataset saved to {output_path}")
+
+
+def add_lag_and_rolling_features(flights: pd.DataFrame) -> pd.DataFrame:
+    processed = flights.copy()
+
+    # drop stale columns from a previous run so we always recompute fresh.
+    stale = [col for col in LAG_ROLLING_COLUMNS if col in processed.columns]
+    if stale:
+        processed = processed.drop(columns=stale)
+
+    group_key = "FlightNumberNormalized"
+    required = {"NbPaxTotal", "LTScheduledDatetime", group_key}
+    if not required.issubset(processed.columns):
+        for col in LAG_ROLLING_COLUMNS:
+            processed[col] = np.nan
+        return processed
+
+    # ── Daily mean pax per (flight, date) ────────────────────────────────────
+    processed["_temp_date"] = pd.to_datetime(processed["LTScheduledDatetime"]).dt.normalize()
+
+    daily = (
+        processed.dropna(subset=[group_key])
+        .groupby([group_key, "_temp_date"])["NbPaxTotal"]
+        .mean()
+        .reset_index()
+        .rename(columns={"NbPaxTotal": "_pax"})
+        .sort_values([group_key, "_temp_date"])
+        .reset_index(drop=True)
+    )
+
+    for n_days, col_name in [(1, "pax_lag_1"), (7, "pax_lag_7"), (30, "pax_lag_30")]:
+        lag_lookup = daily[[group_key, "_temp_date", "_pax"]].copy()
+        lag_lookup["_temp_date"] = lag_lookup["_temp_date"] + pd.Timedelta(days=n_days)
+        lag_lookup = lag_lookup.rename(columns={"_pax": col_name})
+        processed = processed.merge(
+            lag_lookup,
+            on=[group_key, "_temp_date"],
+            how="left",
+        )
+
+    daily["_rolling_7"] = daily.groupby(group_key)["_pax"].transform(
+        lambda s: s.shift(1).rolling(window=7, min_periods=1).mean()
+    )
+
+    # alpha = 2 / (span + 1) = 0.25 for span=7
+    daily["_ewm_7"] = daily.groupby(group_key)["_pax"].transform(
+        lambda s: s.shift(1).ewm(span=7, adjust=False, min_periods=1).mean()
+    )
+    daily["_diff_1"] = daily.groupby(group_key)["_pax"].transform(
+        lambda s: s.shift(1).diff(1)
+    )
+    daily["_diff_7"] = daily.groupby(group_key)["_pax"].transform(
+        lambda s: s.shift(1).diff(7)
+    )
+
+    rolling_lookup = daily[
+        [group_key, "_temp_date", "_rolling_7", "_ewm_7", "_diff_1", "_diff_7"]
+    ].rename(
+        columns={
+            "_rolling_7": "pax_rolling_7",
+            "_ewm_7": "pax_ewm_7",
+            "_diff_1": "pax_diff_1",
+            "_diff_7": "pax_diff_7",
+        }
+    )
+    processed = processed.merge(rolling_lookup, on=[group_key, "_temp_date"], how="left")
+
+    processed = processed.drop(columns=["_temp_date"], errors="ignore")
+    return processed
 
 
 def add_cyclical_datetime_features(flights: pd.DataFrame) -> pd.DataFrame:

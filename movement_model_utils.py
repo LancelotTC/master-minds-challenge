@@ -78,6 +78,14 @@ ENGINEERED_FEATURE_COLUMNS = [
     "is_any_day_off",
     "days_until_next_day_off",
     "days_until_next_workday",
+    # lag & rolling features
+    "pax_lag_1",
+    "pax_lag_7",
+    "pax_lag_30",
+    "pax_rolling_7",
+    "pax_ewm_7", # exponential weighted mean
+    "pax_diff_1",
+    "pax_diff_7",
 ]
 
 FEATURE_COLUMNS = [
