@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -23,6 +24,9 @@ MAIN_DATASET_PATH = Path("data") / "main_dataset.csv"
 ID_COLUMN = "IdMovement"
 ROW_ID_COLUMN = "row_number"
 TARGET_COLUMN = "NbPaxTotal"
+PMR_TARGET_COLUMN = "PMR"
+PMR_ARRIVAL_COLUMN = "OzionPHMRPaxArrival"
+PMR_DEPARTURE_COLUMN = "OzionPHMRPaxDeparture"
 PREDICTION_COLUMN = f"{TARGET_COLUMN}Prediction"
 PREDICTION_OUTPUT_DIR = Path("predictions")
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -152,6 +156,67 @@ class ModelRuntimeConfig:
 
 def _deduplicate_preserve_order(values: list[str] | tuple[str, ...] | set[str]) -> list[str]:
     return list(dict.fromkeys(str(value) for value in values))
+
+
+def get_prediction_column_name(target_column: str) -> str:
+    return f"{target_column}Prediction"
+
+
+def _normalize_direction_key(value: object) -> str | None:
+    if pd.isna(value):
+        return None
+
+    normalized = unicodedata.normalize("NFKD", str(value))
+    normalized = normalized.encode("ascii", "ignore").decode("ascii").strip().lower()
+    if not normalized:
+        return None
+
+    letters_only = "".join(character for character in normalized if character.isalpha())
+    if letters_only.startswith("arriv") or normalized in {"arrivee", "arrival"}:
+        return "arrivee"
+    if letters_only.startswith(("depart", "dpart")) or normalized in {"depart", "departure"}:
+        return "depart"
+    return normalized
+
+
+def get_target_source_columns(target_column: str) -> list[str]:
+    if target_column == PMR_TARGET_COLUMN:
+        return ["Direction", PMR_ARRIVAL_COLUMN, PMR_DEPARTURE_COLUMN]
+    return [target_column]
+
+
+def derive_target_series(dataframe: pd.DataFrame, target_column: str) -> pd.Series:
+    if target_column == PMR_TARGET_COLUMN:
+        if not {"Direction", PMR_ARRIVAL_COLUMN, PMR_DEPARTURE_COLUMN}.issubset(dataframe.columns):
+            raise RuntimeError(
+                "PMR target derivation requires 'Direction', "
+                f"'{PMR_ARRIVAL_COLUMN}', and '{PMR_DEPARTURE_COLUMN}'."
+            )
+
+        direction = dataframe["Direction"].map(_normalize_direction_key)
+        arrival = pd.to_numeric(dataframe[PMR_ARRIVAL_COLUMN], errors="coerce")
+        departure = pd.to_numeric(dataframe[PMR_DEPARTURE_COLUMN], errors="coerce")
+
+        derived = pd.Series(np.nan, index=dataframe.index, dtype=float)
+        arrival_mask = direction.eq("arrivee")
+        departure_mask = direction.eq("depart")
+        derived.loc[arrival_mask] = arrival.loc[arrival_mask]
+        derived.loc[departure_mask] = departure.loc[departure_mask]
+
+        selected_is_missing_or_zero = derived.isna() | derived.eq(0)
+        arrival_nonzero = arrival.notna() & arrival.ne(0)
+        departure_nonzero = departure.notna() & departure.ne(0)
+
+        use_arrival_fallback = selected_is_missing_or_zero & arrival_nonzero
+        use_departure_fallback = selected_is_missing_or_zero & ~use_arrival_fallback & departure_nonzero
+        derived.loc[use_arrival_fallback] = arrival.loc[use_arrival_fallback]
+        derived.loc[use_departure_fallback] = departure.loc[use_departure_fallback]
+
+        return pd.to_numeric(derived, errors="coerce").fillna(0.0)
+
+    if target_column not in dataframe.columns:
+        raise RuntimeError(f"Unknown target column '{target_column}'.")
+    return pd.to_numeric(dataframe[target_column], errors="coerce")
 
 
 def _extract_condition_columns(condition: dict[str, Any] | None) -> list[str]:
@@ -680,13 +745,14 @@ def load_main_dataset_dataframe(
     limit: int | None = None,
     dataset_path: str | Path = MAIN_DATASET_PATH,
     runtime_config: ModelRuntimeConfig | None = None,
+    extra_required_columns: tuple[str, ...] | list[str] = (),
 ) -> pd.DataFrame:
     runtime_config = runtime_config or load_model_runtime_config()
     dataset_path = Path(dataset_path)
     if not dataset_path.exists():
         raise FileNotFoundError(f"Dataset file not found: {dataset_path}")
 
-    required_columns = set(runtime_config.required_columns)
+    required_columns = set(runtime_config.required_columns) | set(extra_required_columns)
     dataframe = pd.read_csv(
         dataset_path,
         usecols=lambda column_name: column_name in required_columns,
@@ -694,9 +760,8 @@ def load_main_dataset_dataframe(
         low_memory=False,
     )
 
-    missing_columns = [
-        column_name for column_name in runtime_config.required_columns if column_name not in dataframe.columns
-    ]
+    expected_columns = _deduplicate_preserve_order([*runtime_config.required_columns, *extra_required_columns])
+    missing_columns = [column_name for column_name in expected_columns if column_name not in dataframe.columns]
     if missing_columns:
         raise RuntimeError(f"Missing required columns in {dataset_path}: {missing_columns}")
 
@@ -726,6 +791,10 @@ def clean_dataframe(
     cleaned[ROW_ID_COLUMN] = pd.to_numeric(cleaned[ROW_ID_COLUMN], errors="coerce")
     cleaned[ID_COLUMN] = to_object_string_series(cleaned[ID_COLUMN])
     cleaned[TARGET_COLUMN] = pd.to_numeric(cleaned[TARGET_COLUMN], errors="coerce")
+    if PMR_ARRIVAL_COLUMN in cleaned.columns:
+        cleaned[PMR_ARRIVAL_COLUMN] = pd.to_numeric(cleaned[PMR_ARRIVAL_COLUMN], errors="coerce")
+    if PMR_DEPARTURE_COLUMN in cleaned.columns:
+        cleaned[PMR_DEPARTURE_COLUMN] = pd.to_numeric(cleaned[PMR_DEPARTURE_COLUMN], errors="coerce")
 
     for column_name in runtime_config.feature_columns:
         if column_name not in cleaned.columns:
@@ -740,8 +809,6 @@ def clean_dataframe(
     object_columns = cleaned.select_dtypes(include=["object"]).columns
     for column_name in object_columns:
         cleaned[column_name] = cleaned[column_name].replace({pd.NA: np.nan})
-
-    cleaned.to_csv("test.csv")
     return cleaned
 
 
@@ -763,15 +830,30 @@ def to_object_string_series(series: pd.Series) -> pd.Series:
 def load_training_and_prediction_frames(
     limit: int | None = None,
     prediction_mode: str = PREDICTION_MODE_MISSING_TARGET,
+    target_column: str = TARGET_COLUMN,
+    prediction_selection_column: str | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.DataFrame]:
-    if prediction_mode not in {PREDICTION_MODE_MISSING_TARGET, PREDICTION_MODE_KNOWN_TARGET}:
-        raise ValueError("prediction_mode must be 'missing_target' or 'known_target'.")
-
     runtime_config = load_model_runtime_config()
-    raw_dataframe = load_main_dataset_dataframe(limit=limit, runtime_config=runtime_config)
+    prediction_selection_column = prediction_selection_column or target_column
+    extra_required_columns = _deduplicate_preserve_order(
+        [*get_target_source_columns(target_column), *get_target_source_columns(prediction_selection_column)]
+    )
+    raw_dataframe = load_main_dataset_dataframe(
+        limit=limit,
+        runtime_config=runtime_config,
+        extra_required_columns=extra_required_columns,
+    )
     raw_dataframe = apply_row_filters(raw_dataframe, runtime_config.row_filters)
+    raw_dataframe[target_column] = derive_target_series(raw_dataframe, target_column)
+    if prediction_selection_column == target_column:
+        selection_target = raw_dataframe[target_column]
+    else:
+        raw_dataframe[prediction_selection_column] = derive_target_series(raw_dataframe, prediction_selection_column)
+        selection_target = raw_dataframe[prediction_selection_column]
+
     feature_dataframe = build_feature_dataframe(raw_dataframe, runtime_config=runtime_config)
-    target = pd.to_numeric(raw_dataframe[TARGET_COLUMN], errors="coerce")
+    target = pd.to_numeric(raw_dataframe[target_column], errors="coerce")
+    selection_target = pd.to_numeric(selection_target, errors="coerce")
     complete_feature_mask = pd.Series(True, index=feature_dataframe.index)
     discarded_feature_mask = ~complete_feature_mask
 
@@ -796,11 +878,8 @@ def load_training_and_prediction_frames(
             *runtime_config.prediction_override_columns,
         ]
     )
-    if prediction_mode == PREDICTION_MODE_KNOWN_TARGET:
-        prediction_mask = training_mask
-        prediction_identifier_columns.append(TARGET_COLUMN)
-    else:
-        prediction_mask = target.isna()
+    prediction_mask = pd.Series(True, index=raw_dataframe.index)
+    prediction_identifier_columns.append(target_column)
     prediction_identifier_columns = _deduplicate_preserve_order(prediction_identifier_columns)
 
     prediction_identifiers = raw_dataframe.loc[prediction_mask, prediction_identifier_columns].copy()
@@ -1029,26 +1108,51 @@ def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
     return preprocessor
 
 
-def write_predictions(
+def build_prediction_output(
     predictions: np.ndarray | list[float],
     identifiers: pd.DataFrame,
-    filename_stem: str,
-) -> Path:
+    target_column: str = TARGET_COLUMN,
+    prediction_column: str | None = None,
+    apply_prediction_overrides_flag: bool = True,
+) -> pd.DataFrame:
     runtime_config = load_model_runtime_config()
     output = identifiers.copy()
-    adjusted_predictions = apply_prediction_overrides(
-        predictions,
-        output,
-        runtime_config.prediction_overrides,
+    prediction_column = prediction_column or get_prediction_column_name(target_column)
+    adjusted_predictions = (
+        apply_prediction_overrides(
+            predictions,
+            output,
+            runtime_config.prediction_overrides,
+        )
+        if apply_prediction_overrides_flag
+        else np.asarray(predictions, dtype=float)
     )
     clipped_predictions = np.clip(np.rint(np.asarray(adjusted_predictions)), 0, None).astype(int)
     output_columns = [
         column_name
-        for column_name in [ROW_ID_COLUMN, ID_COLUMN, "LTScheduledDatetime", TARGET_COLUMN]
+        for column_name in [ROW_ID_COLUMN, ID_COLUMN, "FlightNumberNormalized", "LTScheduledDatetime", target_column]
         if column_name in output.columns
     ]
     output = output[output_columns].copy()
-    output[PREDICTION_COLUMN] = clipped_predictions
+    output[prediction_column] = clipped_predictions
+    return output
+
+
+def write_predictions(
+    predictions: np.ndarray | list[float],
+    identifiers: pd.DataFrame,
+    filename_stem: str,
+    target_column: str = TARGET_COLUMN,
+    prediction_column: str | None = None,
+    apply_prediction_overrides_flag: bool = True,
+) -> Path:
+    output = build_prediction_output(
+        predictions,
+        identifiers,
+        target_column=target_column,
+        prediction_column=prediction_column,
+        apply_prediction_overrides_flag=apply_prediction_overrides_flag,
+    )
 
     model_folder_name = get_model_folder_name(filename_stem)
     model_output_dir = PREDICTION_OUTPUT_DIR / model_folder_name
@@ -1057,41 +1161,104 @@ def write_predictions(
     output.to_csv(output_path, index=False)
     return output_path
 
-
-def write_test_prediction_subset(
+def build_test_prediction_output(
     predictions: np.ndarray | list[float],
     identifiers: pd.DataFrame,
-    filename_stem: str,
-    test_start_date: str | pd.Timestamp,
-    test_end_date: str | pd.Timestamp,
-) -> tuple[Path, int]:
+    test_start_date: str | pd.Timestamp | None,
+    test_end_date: str | pd.Timestamp | None,
+    target_column: str = TARGET_COLUMN,
+    prediction_column: str | None = None,
+    exported_prediction_column_name: str | None = None,
+    apply_prediction_overrides_flag: bool = True,
+) -> pd.DataFrame:
     if "FlightNumberNormalized" not in identifiers.columns:
         raise RuntimeError("Test prediction export requires 'FlightNumberNormalized' in the prediction identifiers.")
     if "LTScheduledDatetime" not in identifiers.columns:
         raise RuntimeError("Test prediction export requires 'LTScheduledDatetime' in the prediction identifiers.")
 
-    runtime_config = load_model_runtime_config()
-    output = identifiers.copy()
-    adjusted_predictions = apply_prediction_overrides(
+    prediction_column = prediction_column or get_prediction_column_name(target_column)
+    exported_prediction_column_name = exported_prediction_column_name or f"Predicted {target_column}"
+    output = build_prediction_output(
         predictions,
-        output,
-        runtime_config.prediction_overrides,
+        identifiers,
+        target_column=target_column,
+        prediction_column=prediction_column,
+        apply_prediction_overrides_flag=apply_prediction_overrides_flag,
     )
-    clipped_predictions = np.clip(np.rint(np.asarray(adjusted_predictions)), 0, None).astype(int)
 
-    test_start = pd.to_datetime(test_start_date).normalize()
-    test_end = pd.to_datetime(test_end_date).normalize()
-    if pd.isna(test_start) or pd.isna(test_end):
-        raise ValueError("Both test_start_date and test_end_date must be valid dates.")
-    if test_start > test_end:
+    if test_start_date is None and test_end_date is None:
+        raise ValueError("At least one of test_start_date or test_end_date must be set to build a test output.")
+
+    test_start = pd.to_datetime(test_start_date).normalize() if test_start_date is not None else None
+    test_end = pd.to_datetime(test_end_date).normalize() if test_end_date is not None else None
+    if test_start_date is not None and pd.isna(test_start):
+        raise ValueError("test_start_date must be a valid date when provided.")
+    if test_end_date is not None and pd.isna(test_end):
+        raise ValueError("test_end_date must be a valid date when provided.")
+    if test_start is not None and test_end is not None and test_start > test_end:
         raise ValueError("test_start_date must be on or before test_end_date.")
 
-    output[PREDICTION_COLUMN] = clipped_predictions
     scheduled = pd.to_datetime(output["LTScheduledDatetime"], errors="coerce").dt.normalize()
-    test_output = output.loc[scheduled.between(test_start, test_end, inclusive="both")].copy()
-    test_output = test_output[
-        ["FlightNumberNormalized", "LTScheduledDatetime", PREDICTION_COLUMN]
-    ].rename(columns={PREDICTION_COLUMN: "Predicted NbPaxTotal"})
+    if test_start is not None and test_end is not None:
+        date_mask = scheduled.between(test_start, test_end, inclusive="both")
+    elif test_start is not None:
+        date_mask = scheduled.ge(test_start)
+    else:
+        date_mask = scheduled.le(test_end)
+
+    test_output = output.loc[date_mask].copy()
+    if test_output.empty:
+        available_dates = scheduled.dropna()
+        if available_dates.empty:
+            raise RuntimeError(
+                "Test prediction export produced no rows because the prediction identifiers do not contain any "
+                "valid 'LTScheduledDatetime' values."
+            )
+        requested_range = (
+            f"{test_start.date()} onward"
+            if test_start is not None and test_end is None
+            else (
+                f"through {test_end.date()}"
+                if test_start is None and test_end is not None
+                else f"{test_start.date()} to {test_end.date()}"
+            )
+        )
+        raise RuntimeError(
+            "Test prediction export produced no rows for the requested date range "
+            f"{requested_range}. "
+            "Available prediction dates are "
+            f"{available_dates.min().date()} to {available_dates.max().date()}."
+        )
+    test_output_columns = [
+        column_name
+        for column_name in [ROW_ID_COLUMN, "FlightNumberNormalized", "LTScheduledDatetime", prediction_column]
+        if column_name in test_output.columns
+    ]
+    test_output = test_output[test_output_columns].rename(columns={prediction_column: exported_prediction_column_name})
+    return test_output
+
+
+def write_test_prediction_subset(
+    predictions: np.ndarray | list[float],
+    identifiers: pd.DataFrame,
+    filename_stem: str,
+    test_start_date: str | pd.Timestamp | None,
+    test_end_date: str | pd.Timestamp | None,
+    target_column: str = TARGET_COLUMN,
+    prediction_column: str | None = None,
+    exported_prediction_column_name: str | None = None,
+    apply_prediction_overrides_flag: bool = True,
+) -> tuple[Path, int]:
+    test_output = build_test_prediction_output(
+        predictions,
+        identifiers,
+        test_start_date,
+        test_end_date,
+        target_column=target_column,
+        prediction_column=prediction_column,
+        exported_prediction_column_name=exported_prediction_column_name,
+        apply_prediction_overrides_flag=apply_prediction_overrides_flag,
+    )
 
     model_folder_name = get_model_folder_name(filename_stem)
     model_output_dir = PREDICTION_OUTPUT_DIR / model_folder_name
@@ -1101,11 +1268,16 @@ def write_test_prediction_subset(
     return output_path, len(test_output)
 
 
-def _prepare_prediction_plot_data(dataframe: pd.DataFrame) -> pd.DataFrame:
+def _prepare_prediction_plot_data(
+    dataframe: pd.DataFrame,
+    target_column: str = TARGET_COLUMN,
+    prediction_column: str | None = None,
+) -> pd.DataFrame:
+    prediction_column = prediction_column or get_prediction_column_name(target_column)
     paired = pd.DataFrame(
         {
-            TARGET_COLUMN: pd.to_numeric(dataframe[TARGET_COLUMN], errors="coerce"),
-            PREDICTION_COLUMN: pd.to_numeric(dataframe[PREDICTION_COLUMN], errors="coerce"),
+            target_column: pd.to_numeric(dataframe[target_column], errors="coerce"),
+            prediction_column: pd.to_numeric(dataframe[prediction_column], errors="coerce"),
         }
     ).dropna()
     return paired
@@ -1113,24 +1285,32 @@ def _prepare_prediction_plot_data(dataframe: pd.DataFrame) -> pd.DataFrame:
 
 def plot_prediction_results(
     predictions_file: str | Path,
+    target_column: str = TARGET_COLUMN,
+    prediction_column: str | None = None,
+    output_suffix: str = "",
     show: bool = False,
     max_points: int = MAX_PLOT_POINTS,
 ) -> Path | None:
     predictions_file = Path(predictions_file)
     dataframe = pd.read_csv(predictions_file)
+    prediction_column = prediction_column or get_prediction_column_name(target_column)
 
-    if TARGET_COLUMN not in dataframe.columns or PREDICTION_COLUMN not in dataframe.columns:
-        print(f"Skipping plot for {predictions_file}: " f"requires both {TARGET_COLUMN} and {PREDICTION_COLUMN}.")
+    if target_column not in dataframe.columns or prediction_column not in dataframe.columns:
+        print(f"Skipping plot for {predictions_file}: " f"requires both {target_column} and {prediction_column}.")
         return None
 
-    plot_data = _prepare_prediction_plot_data(dataframe)
+    plot_data = _prepare_prediction_plot_data(
+        dataframe,
+        target_column=target_column,
+        prediction_column=prediction_column,
+    )
     if plot_data.empty:
         print(f"Skipping plot for {predictions_file}: no plottable values found.")
         return None
 
     full_plot_data = plot_data.copy()
-    actual_full = full_plot_data[TARGET_COLUMN].to_numpy(dtype=float)
-    predicted_full = full_plot_data[PREDICTION_COLUMN].to_numpy(dtype=float)
+    actual_full = full_plot_data[target_column].to_numpy(dtype=float)
+    predicted_full = full_plot_data[prediction_column].to_numpy(dtype=float)
     residual_full = predicted_full - actual_full
     absolute_errors = np.abs(predicted_full - actual_full)
     mean_absolute_deviation = float(np.mean(absolute_errors))
@@ -1144,8 +1324,8 @@ def plot_prediction_results(
 
     import matplotlib.pyplot as plt
 
-    actual_values = plot_data[TARGET_COLUMN].to_numpy(dtype=float)
-    predicted_values = plot_data[PREDICTION_COLUMN].to_numpy(dtype=float)
+    actual_values = plot_data[target_column].to_numpy(dtype=float)
+    predicted_values = plot_data[prediction_column].to_numpy(dtype=float)
     residual_values = predicted_values - actual_values
 
     axis_min = min(0.0, float(np.nanmin([actual_values.min(), predicted_values.min()])))
@@ -1174,8 +1354,8 @@ def plot_prediction_results(
     axes[0].fill_between(line_x, line_x * 0.9, line_x * 1.1, color="orange", alpha=0.08)
     axes[0].set_xlim(axis_min, axis_max)
     axes[0].set_ylim(axis_min, axis_max)
-    axes[0].set_xlabel(TARGET_COLUMN)
-    axes[0].set_ylabel(PREDICTION_COLUMN)
+    axes[0].set_xlabel(target_column)
+    axes[0].set_ylabel(prediction_column)
     axes[0].set_title("Predicted vs actual")
     axes[0].legend(loc="upper left")
     figure.colorbar(density_main, ax=axes[0], label="log10(count)")
@@ -1189,8 +1369,8 @@ def plot_prediction_results(
         cmap="magma",
     )
     axes[1].axhline(0.0, color="white", linewidth=1.5)
-    axes[1].set_xlabel(TARGET_COLUMN)
-    axes[1].set_ylabel(f"{PREDICTION_COLUMN} - {TARGET_COLUMN}")
+    axes[1].set_xlabel(target_column)
+    axes[1].set_ylabel(f"{prediction_column} - {target_column}")
     axes[1].set_title("Residuals")
     figure.colorbar(density_residual, ax=axes[1], label="log10(count)")
 
@@ -1211,10 +1391,10 @@ def plot_prediction_results(
         bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "alpha": 0.9, "edgecolor": "0.8"},
     )
 
-    figure.suptitle(f"{predictions_file.stem} (n={len(plot_data):,})")
+    figure.suptitle(f"{predictions_file.stem}{output_suffix} (n={len(plot_data):,})")
     figure.tight_layout(rect=(0, 0.08, 1, 0.96))
 
-    plot_path = predictions_file.with_suffix(".png")
+    plot_path = predictions_file.with_name(f"{predictions_file.stem}{output_suffix}.png")
     figure.savefig(plot_path, dpi=160, bbox_inches="tight")
     print(f"Plot written to {plot_path}")
 

@@ -6,22 +6,22 @@
       "name": "cap_prediction_to_seats",
       "clip_upper_column": "NbOfSeats"
     },
-    {
-      "name": "force_zero_when_null_idMovement",
-      "set_prediction": 0,
-      "when": {
-        "column": "IdMovement",
-        "operator": "is_null"
-      }
-    },
-    {
-      "name": "force_zero_when_null_IdADL",
-      "set_prediction": 0,
-      "when": {
-        "column": "IdADL",
-        "operator": "is_null"
-      }
-    },
+    // {
+    //   "name": "force_zero_when_null_idMovement",
+    //   "set_prediction": 0,
+    //   "when": {
+    //     "column": "IdMovement",
+    //     "operator": "is_null"
+    //   }
+    // },
+    // {
+    //   "name": "force_zero_when_null_IdADL",
+    //   "set_prediction": 0,
+    //   "when": {
+    //     "column": "IdADL",
+    //     "operator": "is_null"
+    //   }
+    // },
     {
       "name": "force_zero_when_IdBusinessUnitType_is_9",
       "set_prediction": 0,

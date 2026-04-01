@@ -93,10 +93,7 @@ def _find_holiday_csv(folder: Path, candidate_names: list[str]) -> Path | None:
 
 
 def _pick_column(columns: pd.Index, candidates: list[str]) -> str | None:
-    lowered = {
-        str(column).replace("\ufeff", "").strip().lower(): str(column)
-        for column in columns
-    }
+    lowered = {str(column).replace("\ufeff", "").strip().lower(): str(column) for column in columns}
     for candidate in candidates:
         match = lowered.get(candidate.lower())
         if match is not None:
@@ -140,8 +137,7 @@ def _add_world_event_risk_features(flights: pd.DataFrame) -> pd.DataFrame:
 
     if not WORLD_EVENTS_AIRPORTS_FILE.exists() or not WORLD_EVENTS_RISK_FILE.exists():
         print(
-            "Warning: world event parquet files not found in "
-            f"{WORLD_EVENTS_FOLDER}. Risk score will default to 0.0."
+            "Warning: world event parquet files not found in " f"{WORLD_EVENTS_FOLDER}. Risk score will default to 0.0."
         )
         enriched["risk_score"] = 0.0
         return enriched
@@ -202,11 +198,8 @@ def _load_airports_dataset() -> pd.DataFrame:
         return pd.DataFrame(columns=["airport_code", "country_code"])
 
     airports = (
-        pd.read_parquet(WORLD_EVENTS_AIRPORTS_FILE, columns=["iata_code", "iso_country"]).rename(
-            columns={"iata_code": "airport_code", "iso_country": "country_code"}
-        )[
-            ["airport_code", "country_code"]
-        ]
+        pd.read_parquet(WORLD_EVENTS_AIRPORTS_FILE, columns=["iata_code", "iso_country"])
+        .rename(columns={"iata_code": "airport_code", "iso_country": "country_code"})[["airport_code", "country_code"]]
         .assign(
             airport_code=lambda df: _normalize_airport_code_series(df["airport_code"]),
             country_code=lambda df: _normalize_country_code_series(df["country_code"]),
@@ -240,11 +233,13 @@ def _load_airports_with_coords() -> pd.DataFrame:
         return pd.DataFrame(columns=["airport_code", "latitude", "longitude"])
 
     airports = (
-        airports_raw.rename(columns={
-            code_column: "airport_code",
-            lat_column: "latitude",
-            lon_column: "longitude",
-        })[["airport_code", "latitude", "longitude"]]
+        airports_raw.rename(
+            columns={
+                code_column: "airport_code",
+                lat_column: "latitude",
+                lon_column: "longitude",
+            }
+        )[["airport_code", "latitude", "longitude"]]
         .assign(
             airport_code=lambda df: _normalize_airport_code_series(df["airport_code"]),
             latitude=lambda df: pd.to_numeric(df["latitude"], errors="coerce"),
@@ -300,11 +295,13 @@ def add_distance_features(flights: pd.DataFrame) -> pd.DataFrame:
     lyon_lat = float(lyon_row["latitude"].iloc[0]) if not lyon_row.empty else LYON_LAT_FALLBACK
     lyon_lon = float(lyon_row["longitude"].iloc[0]) if not lyon_row.empty else LYON_LON_FALLBACK
 
-    remote_coords = airports_coords.rename(columns={
-        "airport_code": "AirportPrevious",
-        "latitude": "_remote_lat",
-        "longitude": "_remote_lon",
-    })
+    remote_coords = airports_coords.rename(
+        columns={
+            "airport_code": "AirportPrevious",
+            "latitude": "_remote_lat",
+            "longitude": "_remote_lon",
+        }
+    )
     processed = processed.merge(remote_coords, on="AirportPrevious", how="left")
 
     has_coords = processed["_remote_lat"].notna() & processed["_remote_lon"].notna()
@@ -855,16 +852,10 @@ def add_lag_and_rolling_features(flights: pd.DataFrame) -> pd.DataFrame:
     daily["_ewm_7"] = daily.groupby(group_key)["_pax"].transform(
         lambda s: s.shift(1).ewm(span=7, adjust=False, min_periods=1).mean()
     )
-    daily["_diff_1"] = daily.groupby(group_key)["_pax"].transform(
-        lambda s: s.shift(1).diff(1)
-    )
-    daily["_diff_7"] = daily.groupby(group_key)["_pax"].transform(
-        lambda s: s.shift(1).diff(7)
-    )
+    daily["_diff_1"] = daily.groupby(group_key)["_pax"].transform(lambda s: s.shift(1).diff(1))
+    daily["_diff_7"] = daily.groupby(group_key)["_pax"].transform(lambda s: s.shift(1).diff(7))
 
-    rolling_lookup = daily[
-        [group_key, "_temp_date", "_rolling_7", "_ewm_7", "_diff_1", "_diff_7"]
-    ].rename(
+    rolling_lookup = daily[[group_key, "_temp_date", "_rolling_7", "_ewm_7", "_diff_1", "_diff_7"]].rename(
         columns={
             "_rolling_7": "pax_rolling_7",
             "_ewm_7": "pax_ewm_7",
@@ -989,5 +980,5 @@ if __name__ == "__main__":
     load_dotenv()
     ensure_data_directories()
 
-    # load_main_dataset()
+    load_main_dataset()
     merge_datasets()
