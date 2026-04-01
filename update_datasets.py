@@ -125,7 +125,13 @@ def _add_world_event_risk_features(flights: pd.DataFrame) -> pd.DataFrame:
 
     stale_columns = [
         column_name
-        for column_name in ["risk_score", "world_event_country_code", "world_event_date"]
+        for column_name in [
+            "risk_score",
+            "nbDaysSinceRiskStarted",
+            "nbDaysSinceSafeStarted",
+            "world_event_country_code",
+            "world_event_date",
+        ]
         if column_name in enriched.columns
     ]
     if stale_columns:
@@ -133,6 +139,8 @@ def _add_world_event_risk_features(flights: pd.DataFrame) -> pd.DataFrame:
 
     if "AirportPrevious" not in enriched.columns or "LTScheduledDatetime" not in enriched.columns:
         enriched["risk_score"] = 0.0
+        enriched["nbDaysSinceRiskStarted"] = np.nan
+        enriched["nbDaysSinceSafeStarted"] = np.nan
         return enriched
 
     if not WORLD_EVENTS_AIRPORTS_FILE.exists() or not WORLD_EVENTS_RISK_FILE.exists():
@@ -140,10 +148,21 @@ def _add_world_event_risk_features(flights: pd.DataFrame) -> pd.DataFrame:
             "Warning: world event parquet files not found in " f"{WORLD_EVENTS_FOLDER}. Risk score will default to 0.0."
         )
         enriched["risk_score"] = 0.0
+        enriched["nbDaysSinceRiskStarted"] = np.nan
+        enriched["nbDaysSinceSafeStarted"] = np.nan
         return enriched
 
     airports = pd.read_parquet(WORLD_EVENTS_AIRPORTS_FILE, columns=["iata_code", "iso_country"])
-    risk_events = pd.read_parquet(WORLD_EVENTS_RISK_FILE, columns=["iso_country", "Date", "SmoothedRisk"])
+    risk_events = pd.read_parquet(
+        WORLD_EVENTS_RISK_FILE,
+        columns=[
+            "iso_country",
+            "Date",
+            "SmoothedRisk",
+            "nbDaysSinceRiskStarted",
+            "nbDaysSinceSafeStarted",
+        ],
+    )
 
     airports["iata_code"] = _normalize_airport_code_series(airports["iata_code"])
     airports["iso_country"] = _normalize_country_code_series(airports["iso_country"])
@@ -151,8 +170,17 @@ def _add_world_event_risk_features(flights: pd.DataFrame) -> pd.DataFrame:
     risk_events["iso_country"] = _normalize_country_code_series(risk_events["iso_country"])
     risk_events["Date"] = pd.to_datetime(risk_events["Date"], errors="coerce").dt.normalize()
     risk_events["SmoothedRisk"] = pd.to_numeric(risk_events["SmoothedRisk"], errors="coerce")
+    for column_name in ["nbDaysSinceRiskStarted", "nbDaysSinceSafeStarted"]:
+        if column_name in risk_events.columns:
+            risk_events[column_name] = pd.to_numeric(risk_events[column_name], errors="coerce")
     risk_events = (
-        risk_events.rename(columns={"iso_country": "world_event_country_code", "Date": "world_event_date"})
+        risk_events.rename(
+            columns={
+                "iso_country": "world_event_country_code",
+                "Date": "world_event_date",
+                "SmoothedRisk": "risk_score",
+            }
+        )
         .dropna(subset=["world_event_country_code", "world_event_date"])
         .drop_duplicates(subset=["world_event_country_code", "world_event_date"], keep="last")
     )
@@ -174,8 +202,13 @@ def _add_world_event_risk_features(flights: pd.DataFrame) -> pd.DataFrame:
         how="left",
     )
 
-    enriched["risk_score"] = pd.to_numeric(enriched["SmoothedRisk"], errors="coerce").fillna(0.0)
-    enriched = enriched.drop(columns=["SmoothedRisk", "world_event_country_code", "world_event_date"], errors="ignore")
+    enriched["risk_score"] = pd.to_numeric(enriched["risk_score"], errors="coerce").fillna(0.0)
+    for column_name in ["nbDaysSinceRiskStarted", "nbDaysSinceSafeStarted"]:
+        if column_name not in enriched.columns:
+            enriched[column_name] = np.nan
+        else:
+            enriched[column_name] = pd.to_numeric(enriched[column_name], errors="coerce")
+    enriched = enriched.drop(columns=["world_event_country_code", "world_event_date"], errors="ignore")
     return enriched
 
 

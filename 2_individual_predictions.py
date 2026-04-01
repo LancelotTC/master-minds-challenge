@@ -40,11 +40,11 @@ from movement_model_utils import (
 )
 
 TRAINING_START_DATE = "2023-01-01"
-TRAINING_END_DATE = "2026-03-24"
+TRAINING_END_DATE = "2026-03-31"
 VALIDATION_START_DATE = None
 VALIDATION_END_DATE = None
-TEST_START_DATE = "2026-03-25"
-TEST_END_DATE = "2026-03-31"
+TEST_START_DATE = "2026-04-01"
+TEST_END_DATE = "2026-04-02"
 
 
 def params_without(params: dict[str, object], *excluded_keys: str) -> dict[str, object]:

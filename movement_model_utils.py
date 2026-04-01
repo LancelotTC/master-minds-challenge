@@ -27,6 +27,7 @@ TARGET_COLUMN = "NbPaxTotal"
 PMR_TARGET_COLUMN = "PMR"
 PMR_ARRIVAL_COLUMN = "OzionPHMRPaxArrival"
 PMR_DEPARTURE_COLUMN = "OzionPHMRPaxDeparture"
+PAX_HISTORY_TARGET_COLUMN = "__history_nbpaxtotal__"
 PREDICTION_COLUMN = f"{TARGET_COLUMN}Prediction"
 PREDICTION_OUTPUT_DIR = Path("predictions")
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -107,6 +108,15 @@ PROPHET_FEATURE_COLUMNS = [
 FEATURE_COLUMNS = [
     *BASE_FEATURE_COLUMNS,
     *ENGINEERED_FEATURE_COLUMNS,
+]
+CAUSAL_PAX_FEATURE_COLUMNS = [
+    "pax_lag_1",
+    "pax_lag_7",
+    "pax_lag_30",
+    "pax_rolling_7",
+    "pax_ewm_7",
+    "pax_diff_1",
+    "pax_diff_7",
 ]
 
 CATEGORICAL_FEATURE_COLUMNS = {
@@ -622,6 +632,135 @@ def get_feature_datetimes(features: pd.DataFrame) -> pd.Series:
         return pd.to_datetime(raw_values, unit="s", errors="coerce")
 
     return pd.to_datetime(raw_values * 1000.0, unit="s", errors="coerce")
+
+
+def _build_causal_pax_history_daily(
+    features: pd.DataFrame,
+    target: pd.Series,
+) -> pd.DataFrame:
+    if "FlightNumberNormalized" not in features.columns or "LTScheduledDatetime" not in features.columns:
+        return pd.DataFrame(columns=["_group", "_temp_date", "_pax"])
+
+    history = pd.DataFrame(
+        {
+            "_group": (
+                features["FlightNumberNormalized"]
+                .astype("string")
+                .fillna("__MISSING_FLIGHT__")
+                .astype("object")
+            ),
+            "_temp_date": get_feature_datetimes(features).dt.normalize(),
+            "_pax": pd.to_numeric(pd.Series(target, index=features.index), errors="coerce"),
+        },
+        index=features.index,
+    ).dropna(subset=["_temp_date", "_pax"])
+
+    if history.empty:
+        return pd.DataFrame(columns=["_group", "_temp_date", "_pax"])
+
+    return (
+        history.groupby(["_group", "_temp_date"], as_index=False)["_pax"]
+        .mean()
+        .sort_values(["_group", "_temp_date"])
+        .reset_index(drop=True)
+    )
+
+
+def _build_causal_pax_history_state(history_daily: pd.DataFrame) -> pd.DataFrame:
+    if history_daily.empty:
+        return pd.DataFrame(columns=["_group", "_temp_date", "_rolling_7", "_ewm_7", "_diff_1", "_diff_7"])
+
+    history_state = history_daily.sort_values(["_group", "_temp_date"]).reset_index(drop=True).copy()
+    history_state["_rolling_7"] = history_state.groupby("_group")["_pax"].transform(
+        lambda s: s.shift(1).rolling(window=7, min_periods=1).mean()
+    )
+    history_state["_ewm_7"] = history_state.groupby("_group")["_pax"].transform(
+        lambda s: s.shift(1).ewm(span=7, adjust=False, min_periods=1).mean()
+    )
+    history_state["_diff_1"] = history_state.groupby("_group")["_pax"].transform(lambda s: s.shift(1).diff(1))
+    history_state["_diff_7"] = history_state.groupby("_group")["_pax"].transform(lambda s: s.shift(1).diff(7))
+    return history_state[["_group", "_temp_date", "_rolling_7", "_ewm_7", "_diff_1", "_diff_7"]]
+
+
+def apply_causal_pax_history_features(
+    features: pd.DataFrame,
+    history_daily: pd.DataFrame,
+    history_state: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    processed = features.copy()
+    for column_name in CAUSAL_PAX_FEATURE_COLUMNS:
+        processed[column_name] = np.nan
+
+    if (
+        processed.empty
+        or history_daily.empty
+        or "FlightNumberNormalized" not in processed.columns
+        or "LTScheduledDatetime" not in processed.columns
+    ):
+        return processed
+
+    history_state = history_state if history_state is not None else _build_causal_pax_history_state(history_daily)
+
+    lookup = pd.DataFrame(
+        {
+            "_row_id": np.arange(len(processed)),
+            "_group": (
+                processed["FlightNumberNormalized"]
+                .astype("string")
+                .fillna("__MISSING_FLIGHT__")
+                .astype("object")
+            ),
+            "_temp_date": get_feature_datetimes(processed).dt.normalize(),
+        },
+        index=processed.index,
+    )
+
+    if lookup["_temp_date"].isna().all():
+        return processed
+
+    lag_specs = [(1, "pax_lag_1"), (7, "pax_lag_7"), (30, "pax_lag_30")]
+    lag_result = lookup[["_row_id"]].copy()
+    for n_days, column_name in lag_specs:
+        lag_source = history_daily.copy()
+        lag_source["_temp_date"] = lag_source["_temp_date"] + pd.Timedelta(days=n_days)
+        lag_source = lag_source.rename(columns={"_pax": column_name})
+        lag_result = lag_result.merge(
+            lookup[["_row_id", "_group", "_temp_date"]].merge(
+                lag_source[["_group", "_temp_date", column_name]],
+                on=["_group", "_temp_date"],
+                how="left",
+            )[["_row_id", column_name]],
+            on="_row_id",
+            how="left",
+        )
+
+    valid_lookup = lookup.dropna(subset=["_temp_date"]).sort_values(["_group", "_temp_date", "_row_id"]).reset_index(drop=True)
+    valid_state = history_state.dropna(subset=["_temp_date"]).sort_values(["_group", "_temp_date"]).reset_index(drop=True)
+
+    state_result = pd.DataFrame({"_row_id": lookup["_row_id"]})
+    if not valid_lookup.empty and not valid_state.empty:
+        asof_result = pd.merge_asof(
+            valid_lookup,
+            valid_state,
+            on="_temp_date",
+            by="_group",
+            direction="backward",
+            allow_exact_matches=True,
+        )[["_row_id", "_rolling_7", "_ewm_7", "_diff_1", "_diff_7"]]
+        state_result = state_result.merge(asof_result, on="_row_id", how="left")
+    else:
+        for column_name in ["_rolling_7", "_ewm_7", "_diff_1", "_diff_7"]:
+            state_result[column_name] = np.nan
+
+    combined = lag_result.merge(state_result, on="_row_id", how="left").set_index("_row_id")
+    processed["pax_lag_1"] = combined["pax_lag_1"].to_numpy()
+    processed["pax_lag_7"] = combined["pax_lag_7"].to_numpy()
+    processed["pax_lag_30"] = combined["pax_lag_30"].to_numpy()
+    processed["pax_rolling_7"] = combined["_rolling_7"].to_numpy()
+    processed["pax_ewm_7"] = combined["_ewm_7"].to_numpy()
+    processed["pax_diff_1"] = combined["_diff_1"].to_numpy()
+    processed["pax_diff_7"] = combined["_diff_7"].to_numpy()
+    return processed
 
 
 def sort_features_and_target_by_datetime(

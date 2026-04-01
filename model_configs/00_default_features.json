@@ -44,6 +44,12 @@
     "snowfall_sum",
     "windspeed_10m_max",
 
+    // Additional engineered features generated in update_datasets.py
+    "risk_score",
+    "nbDaysSinceRiskStarted",
+    "nbDaysSinceSafeStarted",
+    "flight_distance_km",
+
     // Engineered datetime and countdown features
     "month_of_year",
     "hour_of_day",
