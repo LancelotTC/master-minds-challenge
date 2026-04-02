@@ -24,3 +24,5 @@ tempCodeRunnerFile.*
 /eda_outputs
 /credentials
 /predictions
+logs/
+config/

@@ -12,6 +12,8 @@ numpy
 scipy
 jours_feries_france
 vacances_scolaires_france
+polars
+pyarrow
 
 
 # Machine Learning
@@ -31,3 +33,4 @@ torch
 requests
 tqdm
 google-cloud-bigquery
+google-cloud-bigquery-storage
