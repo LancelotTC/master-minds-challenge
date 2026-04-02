@@ -20,7 +20,6 @@ tempCodeRunnerFile.*
 *.csv
 
 # Folders
-
 /data
 /eda_outputs
 /predictions
