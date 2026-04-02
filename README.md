@@ -2,6 +2,13 @@
 
 This repository contains a tabular machine-learning pipeline for airport movement prediction.
 
+## Participants
+
+- Lancelot TARIOT CAMILLE
+- Romain POIRRIER
+- Maïa JOUENNE
+- Sang NGUYEN
+
 At a high level, the project:
 
 1. downloads a raw movement dataset from BigQuery,
