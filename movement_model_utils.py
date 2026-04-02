@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import re
 import unicodedata
@@ -11,32 +9,31 @@ from typing import Any, Callable, TypeVar
 import numpy as np
 import pandas as pd
 from prophet import Prophet
+from pipeline_config import PIPELINE_CONFIG
 from sklearn.compose import ColumnTransformer
+from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
-from sklearn.base import BaseEstimator, TransformerMixin
 from tqdm.auto import tqdm
-from datetime import datetime
 
-MAIN_DATASET_PATH = Path("data") / "main_dataset.csv"
-ID_COLUMN = "IdMovement"
-ROW_ID_COLUMN = "row_number"
-TARGET_COLUMN = "NbPaxTotal"
-PMR_TARGET_COLUMN = "PMR"
-PMR_ARRIVAL_COLUMN = "OzionPHMRPaxArrival"
-PMR_DEPARTURE_COLUMN = "OzionPHMRPaxDeparture"
+CONFIG = PIPELINE_CONFIG
+MAIN_DATASET_PATH = CONFIG.dataset_paths.main_dataset
+ID_COLUMN = CONFIG.columns.id
+ROW_ID_COLUMN = CONFIG.columns.row_id
+TARGET_COLUMN = CONFIG.columns.target
+PMR_TARGET_COLUMN = CONFIG.columns.pmr_target
+PMR_ARRIVAL_COLUMN = CONFIG.columns.pmr_arrival
+PMR_DEPARTURE_COLUMN = CONFIG.columns.pmr_departure
 PAX_HISTORY_TARGET_COLUMN = "__history_nbpaxtotal__"
 PREDICTION_COLUMN = f"{TARGET_COLUMN}Prediction"
-PREDICTION_OUTPUT_DIR = Path("predictions")
+PREDICTION_OUTPUT_DIR = CONFIG.model_paths.predictions_dir
 PROJECT_ROOT = Path(__file__).resolve().parent
-MODEL_CONFIG_DIR = PROJECT_ROOT / "model_configs"
-HYPERPARAMETERS_RESULTS_PATH = PROJECT_ROOT / "hyperparameters.json"
-MAX_PLOT_POINTS = 80_000
-NULL_LIKE_STRINGS = {"", "NULL", "NONE", "NAN", "NAT"}
-PREDICTION_MODE_MISSING_TARGET = "missing_target"
-PREDICTION_MODE_KNOWN_TARGET = "known_target"
+MODEL_CONFIG_DIR = CONFIG.model_paths.model_configs_dir
+HYPERPARAMETERS_RESULTS_PATH = CONFIG.model_paths.hyperparameters_results
+MAX_PLOT_POINTS = CONFIG.plot.max_points
+NULL_LIKE_STRINGS = CONFIG.null_like_strings
 
 BASE_FEATURE_COLUMNS = [
     "IdAircraftType",
@@ -97,13 +94,7 @@ ENGINEERED_FEATURE_COLUMNS = [
     # distance feature
     "flight_distance_km",  # Haversine distance Lyon (LYS) ↔ AirportPrevious
 ]
-PROPHET_FEATURE_COLUMNS = [
-    "daily_seats",
-    "daily_forecast_pax",
-    "daily_forecast_load_factor",
-    "relative_seat_share_day",
-    "forecast_pax_per_seat_day",
-]
+PROPHET_FEATURE_COLUMNS = list(CONFIG.features.prophet_columns)
 
 FEATURE_COLUMNS = [
     *BASE_FEATURE_COLUMNS,
@@ -199,8 +190,7 @@ def derive_target_series(dataframe: pd.DataFrame, target_column: str) -> pd.Seri
     if target_column == PMR_TARGET_COLUMN:
         if not {"Direction", PMR_ARRIVAL_COLUMN, PMR_DEPARTURE_COLUMN}.issubset(dataframe.columns):
             raise RuntimeError(
-                "PMR target derivation requires 'Direction', "
-                f"'{PMR_ARRIVAL_COLUMN}', and '{PMR_DEPARTURE_COLUMN}'."
+                "PMR target derivation requires 'Direction', " f"'{PMR_ARRIVAL_COLUMN}', and '{PMR_DEPARTURE_COLUMN}'."
             )
 
         direction = dataframe["Direction"].map(_normalize_direction_key)
@@ -644,10 +634,7 @@ def _build_causal_pax_history_daily(
     history = pd.DataFrame(
         {
             "_group": (
-                features["FlightNumberNormalized"]
-                .astype("string")
-                .fillna("__MISSING_FLIGHT__")
-                .astype("object")
+                features["FlightNumberNormalized"].astype("string").fillna("__MISSING_FLIGHT__").astype("object")
             ),
             "_temp_date": get_feature_datetimes(features).dt.normalize(),
             "_pax": pd.to_numeric(pd.Series(target, index=features.index), errors="coerce"),
@@ -705,10 +692,7 @@ def apply_causal_pax_history_features(
         {
             "_row_id": np.arange(len(processed)),
             "_group": (
-                processed["FlightNumberNormalized"]
-                .astype("string")
-                .fillna("__MISSING_FLIGHT__")
-                .astype("object")
+                processed["FlightNumberNormalized"].astype("string").fillna("__MISSING_FLIGHT__").astype("object")
             ),
             "_temp_date": get_feature_datetimes(processed).dt.normalize(),
         },
@@ -734,8 +718,12 @@ def apply_causal_pax_history_features(
             how="left",
         )
 
-    valid_lookup = lookup.dropna(subset=["_temp_date"]).sort_values(["_group", "_temp_date", "_row_id"]).reset_index(drop=True)
-    valid_state = history_state.dropna(subset=["_temp_date"]).sort_values(["_group", "_temp_date"]).reset_index(drop=True)
+    valid_lookup = (
+        lookup.dropna(subset=["_temp_date"]).sort_values(["_group", "_temp_date", "_row_id"]).reset_index(drop=True)
+    )
+    valid_state = (
+        history_state.dropna(subset=["_temp_date"]).sort_values(["_group", "_temp_date"]).reset_index(drop=True)
+    )
 
     state_result = pd.DataFrame({"_row_id": lookup["_row_id"]})
     if not valid_lookup.empty and not valid_state.empty:
@@ -918,12 +906,6 @@ def clean_dataframe(
     runtime_config = runtime_config or load_model_runtime_config()
     cleaned = dataframe.copy()
 
-    # cleaned["LTScheduledDatetime"] = pd.to_datetime(cleaned["LTScheduledDatetime"], format="%Y-%m-%d %H:%M:%S")
-
-    # cleaned = cleaned[cleaned["LTScheduledDatetime"] < datetime(2026, 3, 24)].sort_values("LTScheduledDatetime")
-
-    # cleaned = cleaned[cleaned["NbOfSeats"] >= cleaned["NbPaxTotal"]]
-
     for column_name in cleaned.columns:
         cleaned[column_name] = replace_null_like_values(cleaned[column_name])
 
@@ -968,7 +950,6 @@ def to_object_string_series(series: pd.Series) -> pd.Series:
 
 def load_training_and_prediction_frames(
     limit: int | None = None,
-    prediction_mode: str = PREDICTION_MODE_MISSING_TARGET,
     target_column: str = TARGET_COLUMN,
     prediction_selection_column: str | None = None,
 ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.DataFrame]:
@@ -993,17 +974,6 @@ def load_training_and_prediction_frames(
     feature_dataframe = build_feature_dataframe(raw_dataframe, runtime_config=runtime_config)
     target = pd.to_numeric(raw_dataframe[target_column], errors="coerce")
     selection_target = pd.to_numeric(selection_target, errors="coerce")
-    complete_feature_mask = pd.Series(True, index=feature_dataframe.index)
-    discarded_feature_mask = ~complete_feature_mask
-
-    print_dataset_debug_summary(raw_dataframe, target, complete_feature_mask)
-    if discarded_feature_mask.any():
-        print_discarded_rows_debug(
-            raw_dataframe,
-            feature_dataframe,
-            discarded_feature_mask,
-        )
-
     training_mask = target.notna()
     training_features = feature_dataframe.loc[training_mask, list(runtime_config.feature_columns)].copy()
     training_target = target.loc[training_mask].astype(float)
@@ -1194,22 +1164,6 @@ def make_model_pipeline(model, features: pd.DataFrame) -> Pipeline:
     )
 
 
-def print_dataset_debug_summary(
-    raw_dataframe: pd.DataFrame,
-    target: pd.Series,
-    complete_feature_mask: pd.Series,
-) -> None:
-    return
-
-
-def print_discarded_rows_debug(
-    raw_dataframe: pd.DataFrame,
-    feature_dataframe: pd.DataFrame,
-    discarded_feature_mask: pd.Series,
-) -> None:
-    return
-
-
 def make_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
     runtime_config = load_model_runtime_config()
     categorical_columns = [
@@ -1299,6 +1253,7 @@ def write_predictions(
     output_path = model_output_dir / f"{filename_stem}.csv"
     output.to_csv(output_path, index=False)
     return output_path
+
 
 def build_test_prediction_output(
     predictions: np.ndarray | list[float],

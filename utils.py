@@ -1,6 +1,10 @@
-import sqlite3, os
+import sqlite3
+import unicodedata
 from pathlib import Path
-from sqlite3 import Cursor, Connection
+from sqlite3 import Connection, Cursor
+
+import numpy as np
+import pandas as pd
 
 
 class SqliteManager:
@@ -20,101 +24,89 @@ class SqliteManager:
         self.connection.close()
 
 
-class ProgressBarElements:
-    PROGRESS_RATIO = "{progress_ratio}"
-    PROGRESS_BAR = "{progress_bar}"
-    PROGRESS_PERCENTAGE = "{progress_percentage}"
+def normalize_filename(filename: str) -> str:
+    return "".join(character for character in filename.lower() if character.isalnum())
 
 
-class ProgressBar:
-    _DEFAULT_LAYOUT = (
-        ProgressBarElements.PROGRESS_RATIO,
-        " |",
-        ProgressBarElements.PROGRESS_BAR,
-        "| ",
-        ProgressBarElements.PROGRESS_PERCENTAGE,
+def find_csv_file(folder: Path, candidate_names: list[str]) -> Path | None:
+    for file_name in candidate_names:
+        candidate_path = folder / file_name
+        if candidate_path.exists():
+            return candidate_path
+
+    candidate_tokens = {normalize_filename(name) for name in candidate_names}
+    for csv_path in folder.glob("*.csv"):
+        if normalize_filename(csv_path.name) in candidate_tokens:
+            return csv_path
+
+    return None
+
+
+def pick_column(columns: pd.Index, candidates: list[str]) -> str | None:
+    normalized = {str(column).replace("\ufeff", "").strip().lower(): str(column) for column in columns}
+    for candidate in candidates:
+        match = normalized.get(candidate.lower())
+        if match is not None:
+            return match
+    return None
+
+
+def normalize_text_key(value: object) -> str | None:
+    if pd.isna(value):
+        return None
+
+    normalized = unicodedata.normalize("NFKD", str(value))
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii").strip().lower()
+    return ascii_text or None
+
+
+def normalize_airport_code_series(series: pd.Series) -> pd.Series:
+    normalized = series.astype("string").str.strip().str.upper()
+    return normalized.replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA})
+
+
+def normalize_country_code_series(series: pd.Series) -> pd.Series:
+    normalized = series.astype("string").str.strip().str.upper()
+    return normalized.replace({"": pd.NA, "NAN": pd.NA, "NONE": pd.NA, "<NA>": pd.NA})
+
+
+def normalize_direction_value(value: object) -> str | None:
+    normalized = normalize_text_key(value)
+    letters_only = "".join(character for character in normalized or "" if character.isalpha())
+    if letters_only.startswith("arriv") or normalized in {"arrivee", "arrival"}:
+        return "arrivee"
+    if letters_only.startswith(("depart", "dpart")) or normalized in {"depart", "departure"}:
+        return "depart"
+    return normalized
+
+
+def get_season(month: float) -> str | None:
+    if pd.isna(month):
+        return None
+
+    month = int(month)
+    if month in {12, 1, 2}:
+        return "winter"
+    if month in {3, 4, 5}:
+        return "spring"
+    if month in {6, 7, 8}:
+        return "summer"
+    return "autumn"
+
+
+def haversine_km(
+    lat_series: pd.Series,
+    lon_series: pd.Series,
+    fixed_latitude: float,
+    fixed_longitude: float,
+) -> pd.Series:
+    earth_radius_km = 6371.0
+    lat1_radians = np.radians(lat_series)
+    lat2_radians = np.radians(fixed_latitude)
+    delta_latitude = lat2_radians - lat1_radians
+    delta_longitude = np.radians(fixed_longitude - lon_series)
+    haversine_term = (
+        np.sin(delta_latitude / 2) ** 2
+        + np.cos(lat1_radians) * np.cos(lat2_radians) * np.sin(delta_longitude / 2) ** 2
     )
-
-    def __init__(
-        self,
-        total: int,
-        start_at: int = 1,
-        update_every: int = 1,
-        decimals: int = 1,
-        length: int = 50,
-        void: str = " ",
-        fill: str = "█",
-        print_end: str = "\r",
-        layout: list[str] = None,
-    ) -> None:
-        if update_every < 1:
-            raise ValueError("update_every must be at least 1")
-
-        self.start_at = start_at
-        self.iteration = start_at
-        self.total = total
-        self.update_every = update_every
-        self.decimals = decimals
-        self.length = length
-        self.void = void
-        self.fill = fill
-        self.print_end = print_end
-        self._finished = False
-        self.progress_bar_length = 0
-
-        self.layout = layout or list(self._DEFAULT_LAYOUT)
-
-    def start(self):
-        self.update()
-
-    def update(self):
-        if self.iteration > self.total:
-            if not self._finished:
-                self.finish()
-            self._finished = True
-            return
-
-        try:
-            self.percent = f"{self.iteration / self.total * 100: .{self.decimals}f}"
-        except ZeroDivisionError:
-            raise ValueError("Cannot have total = 0")
-
-        filled_length = int(self.length * self.iteration // self.total)
-
-        bar = self.fill * filled_length + self.void * (self.length - filled_length)
-
-        full_bar = "".join(self.layout).format_map(
-            {
-                "progress_ratio": f"{self.iteration}/{self.total}",
-                "progress_bar": bar,
-                "progress_percentage": f"{self.percent}%",
-            }
-        )
-
-        progress_bar = f"{full_bar: <{os.get_terminal_size().columns}}"
-
-        # This is necessary because all numbers are not the same length every time
-        # But I use os.get_terminal_size().columns instead which deletes the whole line
-        # So
-        # self.progress_bar_length = len(progress_bar)
-
-        print(f"\r{progress_bar}", end=self.print_end)
-
-    def increment(self):
-        self.iteration += 1
-        if self.iteration > self.total or (self.iteration - self.start_at) % self.update_every == 0:
-            self.update()
-
-    def clear_line(self):
-        # print("\r" + " " * self.progress_bar_length, end="\r")
-        print("\r" + " " * os.get_terminal_size().columns, end="\r")
-
-    def finish(self):
-        if self._finished:
-            return
-
-        if self.iteration <= self.total:
-            self.update()
-
-        self._finished = True
-        print()
+    return pd.Series(2 * earth_radius_km * np.arcsin(np.sqrt(haversine_term.clip(0, 1))), index=lat_series.index)
