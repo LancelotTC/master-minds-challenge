@@ -2,6 +2,7 @@
 database.db
 creation_query.sql
 .env
+.venv
 
 # Wildcard files
 *.pyc
