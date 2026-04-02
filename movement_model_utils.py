@@ -1499,6 +1499,82 @@ def plot_prediction_results(
     return plot_path
 
 
+def plot_hourly_sum_profile(
+    predictions_file: str | Path,
+    target_column: str = TARGET_COLUMN,
+    prediction_column: str | None = None,
+    output_suffix: str = "_hourly_profile",
+    show: bool = False,
+) -> Path | None:
+    predictions_file = Path(predictions_file)
+    dataframe = pd.read_csv(predictions_file)
+    prediction_column = prediction_column or get_prediction_column_name(target_column)
+
+    required_columns = {"LTScheduledDatetime", target_column, prediction_column}
+    if not required_columns.issubset(dataframe.columns):
+        print(
+            f"Skipping hourly profile for {predictions_file}: "
+            f"requires {sorted(required_columns)}."
+        )
+        return None
+
+    scheduled = pd.to_datetime(dataframe["LTScheduledDatetime"], errors="coerce")
+    plot_data = pd.DataFrame(
+        {
+            "hour": scheduled.dt.hour,
+            target_column: pd.to_numeric(dataframe[target_column], errors="coerce"),
+            prediction_column: pd.to_numeric(dataframe[prediction_column], errors="coerce"),
+        }
+    ).dropna(subset=["hour", target_column, prediction_column])
+
+    if plot_data.empty:
+        print(f"Skipping hourly profile for {predictions_file}: no plottable values found.")
+        return None
+
+    hourly_totals = (
+        plot_data.groupby("hour", as_index=False)[[target_column, prediction_column]]
+        .sum()
+        .sort_values("hour")
+        .reset_index(drop=True)
+    )
+
+    import matplotlib.pyplot as plt
+
+    figure, axis = plt.subplots(figsize=(12, 6))
+    axis.plot(
+        hourly_totals["hour"],
+        hourly_totals[target_column],
+        marker="o",
+        linewidth=2,
+        label=f"Real {target_column}",
+    )
+    axis.plot(
+        hourly_totals["hour"],
+        hourly_totals[prediction_column],
+        marker="o",
+        linewidth=2,
+        label=f"Predicted {target_column}",
+    )
+    axis.set_xlim(0, 23)
+    axis.set_xticks(range(24))
+    axis.set_xlabel("Hour of day")
+    axis.set_ylabel(target_column)
+    axis.set_title("Hourly summed profile")
+    axis.grid(True, alpha=0.25)
+    axis.legend()
+
+    figure.tight_layout()
+    plot_path = predictions_file.with_name(f"{predictions_file.stem}{output_suffix}.png")
+    figure.savefig(plot_path, dpi=160, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    plt.close(figure)
+    print(f"Plot written to {plot_path}")
+    return plot_path
+
+
 def regenerate_prediction_plots(
     predictions_root: str | Path = PREDICTION_OUTPUT_DIR,
     pattern: str = "*_validation_preds.csv",
@@ -1519,6 +1595,9 @@ def regenerate_prediction_plots(
         plot_path = plot_prediction_results(prediction_file, show=show, max_points=max_points)
         if plot_path is not None:
             generated_plots.append(plot_path)
+        hourly_plot_path = plot_hourly_sum_profile(prediction_file, show=show)
+        if hourly_plot_path is not None:
+            generated_plots.append(hourly_plot_path)
 
     print(f"Regenerated {len(generated_plots)} plot(s) from {len(prediction_files)} prediction file(s).")
     return generated_plots

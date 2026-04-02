@@ -25,6 +25,7 @@ from movement_model_utils import (
     load_hyperparameter_results,
     load_training_and_prediction_frames,
     make_model_pipeline,
+    plot_hourly_sum_profile,
     plot_prediction_results,
     run_progress_step,
     sort_features_and_target_by_datetime,
@@ -237,9 +238,9 @@ class IndividualPredictionRunner:
             raise RuntimeError("No enabled regressors found in hyperparameters.json.")
 
         for name, model in tqdm(regressors.items(), total=len(regressors), desc="Regressors", unit="model"):
-            step_total = 8
+            step_total = 5
             if self.config.has_validation_window():
-                step_total += 2
+                step_total += 6
             if self.config.has_test_window():
                 step_total += 1
 
@@ -327,6 +328,7 @@ class IndividualPredictionRunner:
 
                 if validation_output_path is not None:
                     run_progress_step(step_progress, "plot", plot_prediction_results, validation_output_path)
+                    run_progress_step(step_progress, "plot_hourly", plot_hourly_sum_profile, validation_output_path)
                     run_progress_step(
                         step_progress,
                         "plot_pmr",
