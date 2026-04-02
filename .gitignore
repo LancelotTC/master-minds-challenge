@@ -2,6 +2,7 @@
 database.db
 creation_query.sql
 .env
+va-sdh-adl-staging.json
 
 # Wildcard files
 *.pyc
@@ -22,5 +23,4 @@ tempCodeRunnerFile.*
 
 /data
 /eda_outputs
-/credentials
 /predictions
