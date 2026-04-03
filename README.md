@@ -92,27 +92,27 @@ python update_datasets.py
 Open any notebook in VS Code / JupyterLab and **Run All Cells**.  
 Each notebook is self-contained — it connects to `database.db`, runs its analysis, and writes outputs to its dedicated folder under `outputs/`.
 
-| Step | Notebook | What it does | Outputs |
-|------|----------|--------------|---------|
-| 1 | `data_quality.ipynb` | Extended missing-value detection (null + string placeholders like `""`, `"NaN"`, `"N/A"`, `"-"`), duplicates, dtype validation, invalid value checks | `outputs/data_quality/` |
-| 2 | `descriptive_stats.ipynb` | Column overview, numeric describe + skewness/kurtosis, categorical value counts, NbPaxTotal deep-dive | `outputs/descriptive_stats/` |
-| 3 | `data_visualization.ipynb` | 13 charts: traffic by direction/airline/hour/terminal/route, delay analysis, passenger distributions | `outputs/visualization/` |
-| 4 | `correlation.ipynb` | Pearson/Spearman correlations and categorical ANOVA for all 195 features vs `NbPaxTotal`, ranked feature importance | `outputs/correlation/` |
-| 5 | `outlier_analysis.ipynb` | IQR-based outlier detection on numeric columns, distribution plots | `outputs/outlier_analysis/` |
+| Step | Notebook                   | What it does                                                                                                                                         | Outputs                      |
+| ---- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| 1    | `data_quality.ipynb`       | Extended missing-value detection (null + string placeholders like `""`, `"NaN"`, `"N/A"`, `"-"`), duplicates, dtype validation, invalid value checks | `outputs/data_quality/`      |
+| 2    | `descriptive_stats.ipynb`  | Column overview, numeric describe + skewness/kurtosis, categorical value counts, NbPaxTotal deep-dive                                                | `outputs/descriptive_stats/` |
+| 3    | `data_visualization.ipynb` | 13 charts: traffic by direction/airline/hour/terminal/route, delay analysis, passenger distributions                                                 | `outputs/visualization/`     |
+| 4    | `correlation.ipynb`        | Pearson/Spearman correlations and categorical ANOVA for all 195 features vs `NbPaxTotal`, ranked feature importance                                  | `outputs/correlation/`       |
+| 5    | `outlier_analysis.ipynb`   | IQR-based outlier detection on numeric columns, distribution plots                                                                                   | `outputs/outlier_analysis/`  |
 
 ---
 
 ## 📊 Dataset Summary
 
-| Property | Value |
-|----------|-------|
-| Source | Lyon Saint-Exupéry Airport (INSA challenge) |
-| Table | `mouvements_aero_insa` |
-| Rows | 364,623 |
-| Columns | 195 |
-| Target variable | `NbPaxTotal` (total passengers per flight) |
-| Time coverage | See `LTScheduledDatetime` range in `data_quality.ipynb` |
-| Key features | Direction (A/D), airline, aircraft type, terminal, origin/destination airport, scheduled & actual times, delay, weather, holiday flags |
+| Property        | Value                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Source          | Lyon Saint-Exupéry Airport (INSA challenge)                                                                                            |
+| Table           | `mouvements_aero_insa`                                                                                                                 |
+| Rows            | 364,623                                                                                                                                |
+| Columns         | 195                                                                                                                                    |
+| Target variable | `NbPaxTotal` (total passengers per flight)                                                                                             |
+| Time coverage   | See `LTScheduledDatetime` range in `data_quality.ipynb`                                                                                |
+| Key features    | Direction (A/D), airline, aircraft type, terminal, origin/destination airport, scheduled & actual times, delay, weather, holiday flags |
 
 > ⚠️ **Missing data note:** Many columns contain string-encoded missing values (`""`, `"NaN"`, `"N/A"`, `"unknown"`, etc.) in addition to true `null`.  
 > The `data_quality.ipynb` notebook handles both forms — see `outputs/data_quality/missing_report.csv` for the full breakdown.
